@@ -2,49 +2,125 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8">
-  <title>Тест камеры</title>
+  <title>WebAR с моделью</title>
   <style>
     body, html {
       margin: 0;
-      padding: 0;
       overflow: hidden;
       background: #000;
     }
     video {
+      position: fixed;
+      top: 0; left: 0;
       width: 100vw;
       height: 100vh;
       object-fit: cover;
+      z-index: -1;
     }
-    #error {
-      color: red;
-      font-family: sans-serif;
+    canvas {
       position: absolute;
-      top: 10px;
-      left: 10px;
-      background: rgba(0,0,0,0.7);
-      padding: 10px;
-      border-radius: 8px;
-      display: none;
+      top: 0;
+      left: 0;
+      z-index: 0;
+    }
+    #controls {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0, 0, 0, 0.6);
+      padding: 10px 20px;
+      border-radius: 10px;
+      color: #fff;
+      font-family: sans-serif;
+      z-index: 2;
+    }
+    input[type="range"] {
+      width: 150px;
+    }
+    button {
+      margin-left: 10px;
+      padding: 6px 12px;
     }
   </style>
 </head>
 <body>
 
-<video id="video" autoplay playsinline muted></video>
-<div id="error">❌ Камера не работает. Разрешите доступ в браузере.</div>
+<video id="video" autoplay muted playsinline></video>
 
-<script>
+<div id="controls">
+  Масштаб:
+  <input type="range" id="scaleSlider" min="0.1" max="3" step="0.1" value="1">
+  <button id="fixBtn">Фиксировать</button>
+</div>
+
+<script type="module">
+  import * as THREE from 'https://cdn.skypack.dev/three';
+  import { GLTFLoader } from 'https://cdn.skypack.dev/three/examples/jsm/loaders/GLTFLoader.js';
+
   const video = document.getElementById('video');
-  const error = document.getElementById('error');
 
+  // Запускаем камеру
   navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
     .then(stream => {
       video.srcObject = stream;
     })
     .catch(err => {
-      console.error('Ошибка камеры:', err);
-      error.style.display = 'block';
+      alert("❌ Нет доступа к камере.");
     });
+
+  // ТриД сцена
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 100);
+  camera.position.z = 2;
+
+  const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  document.body.appendChild(renderer.domElement);
+
+  // Свет
+  const light = new THREE.HemisphereLight(0xffffff, 0x444444);
+  scene.add(light);
+
+  // Загрузка модели
+  let model;
+  const loader = new GLTFLoader();
+  loader.load('model.glb', (gltf) => {
+    model = gltf.scene;
+    model.scale.set(1, 1, 1);
+    scene.add(model);
+  });
+
+  // Масштаб
+  const slider = document.getElementById('scaleSlider');
+  slider.addEventListener('input', () => {
+    if (model) {
+      const s = parseFloat(slider.value);
+      model.scale.set(s, s, s);
+    }
+  });
+
+  let fixed = false;
+  document.getElementById('fixBtn').addEventListener('click', () => {
+    fixed = true;
+  });
+
+  function animate() {
+    requestAnimationFrame(animate);
+
+    if (model && !fixed) {
+      model.rotation.y += 0.005; // можно отключить
+    }
+
+    renderer.render(scene, camera);
+  }
+  animate();
+
+  window.addEventListener('resize', () => {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+  });
 </script>
 
 </body>
