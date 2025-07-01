@@ -1,8 +1,8 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-  <meta charset="UTF-8">
-  <title>WebAR с моделью</title>
+  <meta charset="UTF-8" />
+  <title>WebAR Куб</title>
   <style>
     body, html {
       margin: 0;
@@ -19,9 +19,7 @@
     }
     canvas {
       position: absolute;
-      top: 0;
-      left: 0;
-      z-index: 0;
+      top: 0; left: 0;
     }
     #controls {
       position: fixed;
@@ -30,7 +28,7 @@
       transform: translateX(-50%);
       background: rgba(0, 0, 0, 0.6);
       padding: 10px 20px;
-      border-radius: 10px;
+      border-radius: 12px;
       color: #fff;
       font-family: sans-serif;
       z-index: 2;
@@ -41,6 +39,7 @@
     button {
       margin-left: 10px;
       padding: 6px 12px;
+      font-size: 16px;
     }
   </style>
 </head>
@@ -51,7 +50,7 @@
 <div id="controls">
   Масштаб:
   <input type="range" id="scaleSlider" min="0.1" max="3" step="0.1" value="1">
-  <button id="fixBtn">Фиксировать</button>
+  <button id="lockBtn">Фиксировать</button>
 </div>
 
 <script type="module">
@@ -60,62 +59,75 @@
 
   const video = document.getElementById('video');
 
-  // Запускаем камеру
-  navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
-    .then(stream => {
+  // Камера сзади
+  navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false })
+    .then((stream) => {
       video.srcObject = stream;
+      video.play();
     })
-    .catch(err => {
-      alert("❌ Нет доступа к камере.");
+    .catch((err) => {
+      alert("❌ Нет доступа к камере");
+      console.error(err);
     });
 
-  // ТриД сцена
+  // Сцена
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 100);
-  camera.position.z = 2;
-
   const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
   renderer.setSize(window.innerWidth, window.innerHeight);
   document.body.appendChild(renderer.domElement);
 
-  // Свет
   const light = new THREE.HemisphereLight(0xffffff, 0x444444);
   scene.add(light);
 
-  // Загрузка модели
   let model;
   const loader = new GLTFLoader();
-  loader.load('model.glb', (gltf) => {
+  loader.load('cube.glb', (gltf) => {
     model = gltf.scene;
-    model.scale.set(1, 1, 1);
+
+    // Центрируем и масштабируем
+    const box = new THREE.Box3().setFromObject(model);
+    const center = box.getCenter(new THREE.Vector3());
+    const size = box.getSize(new THREE.Vector3()).length();
+    const scaleFactor = 1.0 / size * 0.5;
+
+    model.position.sub(center); // Центрируем
+    model.scale.setScalar(scaleFactor); // Уменьшаем
+
     scene.add(model);
   });
 
   // Масштаб
-  const slider = document.getElementById('scaleSlider');
-  slider.addEventListener('input', () => {
+  const scaleSlider = document.getElementById('scaleSlider');
+  scaleSlider.addEventListener('input', () => {
     if (model) {
-      const s = parseFloat(slider.value);
-      model.scale.set(s, s, s);
+      const s = parseFloat(scaleSlider.value);
+      model.scale.setScalar(s);
     }
   });
 
-  let fixed = false;
-  document.getElementById('fixBtn').addEventListener('click', () => {
-    fixed = true;
+  let isFixed = false;
+  document.getElementById('lockBtn').addEventListener('click', () => {
+    isFixed = true;
   });
 
   function animate() {
     requestAnimationFrame(animate);
 
-    if (model && !fixed) {
-      model.rotation.y += 0.005; // можно отключить
+    if (model && !isFixed) {
+      const distance = 2;
+      const direction = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
+      const position = direction.multiplyScalar(distance);
+      model.position.copy(camera.position).add(position);
+      model.quaternion.copy(camera.quaternion);
     }
 
     renderer.render(scene, camera);
   }
+
   animate();
 
+  // Обработка изменения размеров окна
   window.addEventListener('resize', () => {
     camera.aspect = window.innerWidth / window.innerHeight;
     camera.updateProjectionMatrix();
