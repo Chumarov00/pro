@@ -2,100 +2,35 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8" />
-  <title>WebAR: Куб + Камера</title>
+  <title>Тест камеры</title>
   <style>
-    body, html {
+    html, body {
       margin: 0;
       padding: 0;
       overflow: hidden;
-      background: #000;
+      background: black;
     }
     video {
-      position: fixed;
-      top: 0; left: 0;
       width: 100vw;
       height: 100vh;
       object-fit: cover;
-      z-index: -1;
-    }
-    canvas {
-      position: absolute;
-      top: 0;
-      left: 0;
     }
   </style>
 </head>
 <body>
+  <video id="video" autoplay muted playsinline></video>
 
-<video id="video" autoplay muted playsinline></video>
+  <script>
+    const video = document.getElementById("video");
 
-<script type="module">
-  import * as THREE from 'https://cdn.skypack.dev/three';
-  import { GLTFLoader } from 'https://cdn.skypack.dev/three/examples/jsm/loaders/GLTFLoader.js';
-
-  const video = document.getElementById('video');
-
-  // 1. Всегда сначала запрашиваем камеру
-  navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
-    .then(stream => {
-      video.srcObject = stream;
-
-      // Только после того как камера разрешена — запускаем 3D
-      init3D();
-    })
-    .catch(err => {
-      alert('❌ Нет доступа к камере');
-      console.error(err);
-    });
-
-  function init3D() {
-    const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 100);
-    camera.position.z = 2;
-
-    const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    document.body.appendChild(renderer.domElement);
-
-    const light = new THREE.HemisphereLight(0xffffff, 0x444444);
-    scene.add(light);
-
-    const loader = new GLTFLoader();
-    loader.load('cube.glb',
-      (gltf) => {
-        const model = gltf.scene;
-
-        // Центрируем и уменьшаем
-        const box = new THREE.Box3().setFromObject(model);
-        const center = box.getCenter(new THREE.Vector3());
-        const size = box.getSize(new THREE.Vector3()).length();
-        const scaleFactor = 1.0 / size * 0.5;
-
-        model.position.sub(center);
-        model.scale.setScalar(scaleFactor);
-        model.position.z = -2;
-
-        scene.add(model);
-        animate();
-      },
-      undefined,
-      (error) => {
-        console.error("Ошибка загрузки модели:", error);
-      }
-    );
-
-    function animate() {
-      requestAnimationFrame(animate);
-      renderer.render(scene, camera);
-    }
-
-    window.addEventListener('resize', () => {
-      camera.aspect = window.innerWidth / window.innerHeight;
-      camera.updateProjectionMatrix();
-      renderer.setSize(window.innerWidth, window.innerHeight);
-    });
-  }
-</script>
-
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
+      .then((stream) => {
+        video.srcObject = stream;
+      })
+      .catch((err) => {
+        alert("❌ Камера не доступна: " + err.name);
+        console.error(err);
+      });
+  </script>
 </body>
 </html>
