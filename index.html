@@ -60,7 +60,8 @@
 <script src="https://cdn.jsdelivr.net/npm/three@0.150.1/examples/js/loaders/GLTFLoader.js"></script>
 
 <script>
-let model, isFixed = false;
+let model = null;
+let isFixed = false;
 
 const log = document.getElementById("log");
 const fixBtn = document.getElementById("fixBtn");
@@ -91,12 +92,12 @@ function initScene() {
   renderer.setSize(window.innerWidth, window.innerHeight);
   document.body.appendChild(renderer.domElement);
 
-  // Свет
   const light = new THREE.AmbientLight(0xffffff, 1.2);
   scene.add(light);
 
   const loader = new THREE.GLTFLoader();
   loader.load(
+    // Замени на свою модель, если нужно:
     'https://modelviewer.dev/shared-assets/models/Astronaut.glb',
     function(gltf) {
       model = gltf.scene;
@@ -130,7 +131,7 @@ function initScene() {
   function animate() {
     requestAnimationFrame(animate);
 
-    // Модель следует за направлением камеры, если не зафиксирована
+    // Безопасная проверка на наличие модели
     if (model && !isFixed) {
       const camDir = new THREE.Vector3();
       camera.getWorldDirection(camDir);
