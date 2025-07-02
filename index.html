@@ -2,13 +2,13 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8" />
-  <title>Отладка WebGL + Камера</title>
+  <title>WebAR debug</title>
   <style>
     html, body {
       margin: 0;
       padding: 0;
-      background: black;
       overflow: hidden;
+      background: black;
     }
     video {
       position: fixed;
@@ -20,8 +20,9 @@
     }
     canvas {
       position: absolute;
-      top: 0; left: 0;
-      z-index: 0;
+      top: 0;
+      left: 0;
+      z-index: 1;
     }
     #log {
       position: absolute;
@@ -40,9 +41,10 @@
 <video id="video" autoplay muted playsinline></video>
 <div id="log">🔍 Загружается...</div>
 
-<script type="module">
-  import * as THREE from 'https://cdn.skypack.dev/three';
+<!-- Three.js CDN -->
+<script src="https://cdn.jsdelivr.net/npm/three@0.150.1/build/three.min.js"></script>
 
+<script>
   const log = document.getElementById("log");
   function logMsg(msg) {
     log.textContent = msg;
@@ -72,11 +74,6 @@
     renderer.setSize(window.innerWidth, window.innerHeight);
     document.body.appendChild(renderer.domElement);
 
-    if (!renderer.domElement) {
-      logMsg("❌ Canvas не создан!");
-      return;
-    }
-
     logMsg("✅ WebGL и canvas активны");
 
     const light = new THREE.AmbientLight(0xffffff);
@@ -93,7 +90,14 @@
       cube.rotation.y += 0.01;
       renderer.render(scene, camera);
     }
+
     animate();
+
+    window.addEventListener("resize", () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
   }
 </script>
 
