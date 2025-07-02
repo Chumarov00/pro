@@ -2,13 +2,13 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8" />
-  <title>Камера + 3D Куб</title>
+  <title>Отладка WebGL + Камера</title>
   <style>
     html, body {
       margin: 0;
       padding: 0;
-      overflow: hidden;
       background: black;
+      overflow: hidden;
     }
     video {
       position: fixed;
@@ -21,62 +21,79 @@
     canvas {
       position: absolute;
       top: 0; left: 0;
-      z-index: 1;
+      z-index: 0;
+    }
+    #log {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      color: white;
+      background: rgba(0,0,0,0.6);
+      padding: 8px;
+      font-family: monospace;
+      z-index: 999;
     }
   </style>
 </head>
 <body>
 
 <video id="video" autoplay muted playsinline></video>
+<div id="log">🔍 Загружается...</div>
 
 <script type="module">
   import * as THREE from 'https://cdn.skypack.dev/three';
+
+  const log = document.getElementById("log");
+  function logMsg(msg) {
+    log.textContent = msg;
+    console.log(msg);
+  }
 
   const video = document.getElementById("video");
 
   navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
     .then((stream) => {
+      logMsg("📷 Камера получена");
       video.srcObject = stream;
       init3D();
     })
     .catch((err) => {
-      alert("❌ Ошибка камеры: " + err.name);
+      logMsg("❌ Ошибка камеры: " + err.name);
     });
 
   function init3D() {
+    logMsg("🧱 Инициализация сцены");
+
     const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.01, 100);
+    const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 100);
     camera.position.z = 2;
 
     const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
     renderer.setSize(window.innerWidth, window.innerHeight);
     document.body.appendChild(renderer.domElement);
 
-    // Свет
-    const light = new THREE.DirectionalLight(0xffffff, 1);
-    light.position.set(0, 1, 1);
+    if (!renderer.domElement) {
+      logMsg("❌ Canvas не создан!");
+      return;
+    }
+
+    logMsg("✅ WebGL и canvas активны");
+
+    const light = new THREE.AmbientLight(0xffffff);
     scene.add(light);
 
-    // Куб
-    const geometry = new THREE.BoxGeometry(1, 1, 1);
-    const material = new THREE.MeshStandardMaterial({ color: 0x00ff00 });
+    const geometry = new THREE.BoxGeometry();
+    const material = new THREE.MeshStandardMaterial({ color: 0xff0000 });
     const cube = new THREE.Mesh(geometry, material);
     scene.add(cube);
 
     function animate() {
       requestAnimationFrame(animate);
+      cube.rotation.x += 0.01;
       cube.rotation.y += 0.01;
-      cube.rotation.x += 0.005;
       renderer.render(scene, camera);
     }
-
     animate();
-
-    window.addEventListener("resize", () => {
-      camera.aspect = window.innerWidth / window.innerHeight;
-      camera.updateProjectionMatrix();
-      renderer.setSize(window.innerWidth, window.innerHeight);
-    });
   }
 </script>
 
