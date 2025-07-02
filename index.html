@@ -2,17 +2,17 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8" />
-  <title>WebAR с моделью1</title>
+  <title>WebAR: Фиксация модели</title>
   <style>
     html, body {
       margin: 0;
-      padding: 0;
-      background: black;
       overflow: hidden;
+      background: black;
     }
     video {
       position: fixed;
-      top: 0; left: 0;
+      top: 0;
+      left: 0;
       width: 100vw;
       height: 100vh;
       object-fit: cover;
@@ -22,17 +22,30 @@
       position: absolute;
       top: 0;
       left: 0;
-      z-index: 1;
     }
     #log {
       position: absolute;
       top: 10px;
       left: 10px;
       color: white;
-      background: rgba(0,0,0,0.6);
-      padding: 8px;
+      background: rgba(0,0,0,0.5);
+      padding: 5px 10px;
       font-family: monospace;
-      z-index: 999;
+      z-index: 99;
+    }
+    #fixBtn {
+      position: absolute;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      padding: 12px 24px;
+      font-size: 16px;
+      background: #2196f3;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      z-index: 100;
+      cursor: pointer;
     }
   </style>
 </head>
@@ -40,84 +53,99 @@
 
 <video id="video" autoplay muted playsinline></video>
 <div id="log">🔍 Загружается...</div>
+<button id="fixBtn">📌 Зафиксировать</button>
 
-<!-- Three.js + GLTFLoader -->
+<!-- Three.js и GLTFLoader -->
 <script src="https://cdn.jsdelivr.net/npm/three@0.150.1/build/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.150.1/examples/js/loaders/GLTFLoader.js"></script>
 
 <script>
-  const log = document.getElementById("log");
-  function logMsg(msg) {
-    log.textContent = msg;
-    console.log(msg);
-  }
+let model, isFixed = false;
 
-  const video = document.getElementById("video");
+const log = document.getElementById("log");
+const fixBtn = document.getElementById("fixBtn");
+const video = document.getElementById("video");
 
-  navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
-    .then((stream) => {
-      logMsg("📷 Камера получена");
-      video.srcObject = stream;
-      init3D();
-    })
-    .catch((err) => {
-      logMsg("❌ Ошибка камеры: " + err.name);
-    });
+function logMsg(msg) {
+  log.textContent = msg;
+  console.log(msg);
+}
 
-  function init3D() {
-    logMsg("🧱 Инициализация сцены");
+// Получаем доступ к камере
+navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
+  .then(stream => {
+    logMsg("📷 Камера работает");
+    video.srcObject = stream;
+    initScene();
+  })
+  .catch(err => {
+    logMsg("❌ Ошибка камеры: " + err.name);
+  });
 
-    const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 100);
-    camera.position.z = 2;
+function initScene() {
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 100);
+  camera.position.z = 2;
 
-    const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    document.body.appendChild(renderer.domElement);
+  const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  document.body.appendChild(renderer.domElement);
 
-    const light = new THREE.AmbientLight(0xffffff);
-    scene.add(light);
+  // Свет
+  const light = new THREE.AmbientLight(0xffffff, 1.2);
+  scene.add(light);
 
-    // Загрузка модели
-    const loader = new THREE.GLTFLoader();
-    loader.load(
-      'https://modelviewer.dev/shared-assets/models/Astronaut.glb',
-      function (gltf) {
-        const model = gltf.scene;
+  const loader = new THREE.GLTFLoader();
+  loader.load(
+    'model.glb',
+    function(gltf) {
+      model = gltf.scene;
 
-        // Центрирование и масштабирование
-        const box = new THREE.Box3().setFromObject(model);
-        const center = box.getCenter(new THREE.Vector3());
-        const size = box.getSize(new THREE.Vector3()).length();
-        const scaleFactor = 1 / size * 0.5;
+      // Центрируем и масштабируем
+      const box = new THREE.Box3().setFromObject(model);
+      const center = box.getCenter(new THREE.Vector3());
+      const size = box.getSize(new THREE.Vector3()).length();
+      const scale = 1 / size * 0.5;
 
-        model.position.sub(center); // центрируем
-        model.scale.setScalar(scaleFactor);
-        model.position.z = -2;
+      model.position.sub(center);
+      model.scale.setScalar(scale);
+      model.position.z = -1.5;
 
-        scene.add(model);
-        logMsg("✅ Модель загружена");
+      scene.add(model);
+      logMsg("✅ Модель загружена");
+      animate();
+    },
+    undefined,
+    function(error) {
+      logMsg("❌ Ошибка загрузки модели");
+      console.error(error);
+    }
+  );
 
-        animate();
-      },
-      undefined,
-      function (error) {
-        logMsg("❌ Ошибка загрузки модели");
-        console.error(error);
-      }
-    );
+  fixBtn.addEventListener("click", () => {
+    isFixed = true;
+    logMsg("📌 Модель зафиксирована");
+  });
 
-    function animate() {
-      requestAnimationFrame(animate);
-      renderer.render(scene, camera);
+  function animate() {
+    requestAnimationFrame(animate);
+
+    // Модель следует за направлением камеры, если не зафиксирована
+    if (model && !isFixed) {
+      const camDir = new THREE.Vector3();
+      camera.getWorldDirection(camDir);
+      model.position.copy(camera.position).add(camDir.multiplyScalar(1.5));
     }
 
-    window.addEventListener("resize", () => {
-      camera.aspect = window.innerWidth / window.innerHeight;
-      camera.updateProjectionMatrix();
-      renderer.setSize(window.innerWidth, window.innerHeight);
-    });
+    renderer.render(scene, camera);
   }
+
+  window.addEventListener("resize", () => {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+  });
+}
 </script>
 
 </body>
