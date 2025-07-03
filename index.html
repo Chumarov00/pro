@@ -97,12 +97,11 @@ function initScene() {
 
   const loader = new THREE.GLTFLoader();
   loader.load(
-    // Замени на свою модель, если нужно:
-    'cube.glb',
+    // 🔗 Абсолютный путь к твоей модели на GitHub Pages:
+    'https://chumarov00.github.io/pro/model.glb',
     function(gltf) {
       model = gltf.scene;
 
-      // Центрируем и масштабируем
       const box = new THREE.Box3().setFromObject(model);
       const center = box.getCenter(new THREE.Vector3());
       const size = box.getSize(new THREE.Vector3()).length();
@@ -131,7 +130,6 @@ function initScene() {
   function animate() {
     requestAnimationFrame(animate);
 
-    // Безопасная проверка на наличие модели
     if (model && !isFixed) {
       const camDir = new THREE.Vector3();
       camera.getWorldDirection(camDir);
