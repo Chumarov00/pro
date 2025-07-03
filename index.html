@@ -95,24 +95,30 @@ function initScene() {
   scene.add(light);
 
   const loader = new THREE.GLTFLoader();
-  loader.load(
-    "model.glb",  // 💡 здесь укажи путь к своей модели
-    function(gltf) {
-      model = gltf.scene;
+ loader.load(
+  "model.glb",
+  function(gltf) {
+    model = gltf.scene;
 
-      const box = new THREE.Box3().setFromObject(model);
-      const center = box.getCenter(new THREE.Vector3());
-      const size = box.getSize(new THREE.Vector3()).length();
-      const scale = 1 / size * 0.5;
+    const box = new THREE.Box3().setFromObject(model);
+    const center = box.getCenter(new THREE.Vector3());
+    const size = box.getSize(new THREE.Vector3()).length();
+    const scale = 1 / size * 0.5;
 
-      model.position.sub(center);
-      model.scale.setScalar(scale);
-      model.position.z = -1.5;
+    model.position.sub(center);
+    model.scale.setScalar(scale);
+    model.position.z = -1.5;
 
-      scene.add(model);
-      logMsg("✅ Модель загружена");
-      animate();
-    },
+    scene.add(model);
+    logMsg("✅ Модель загружена");
+    animate();
+  },
+  undefined,
+  function(error) {
+    logMsg("❌ Ошибка загрузки модели: " + error.message || error);
+    console.error("Ошибка загрузки модели:", error);
+  }
+);
     undefined,
     function(error) {
       logMsg("❌ Ошибка загрузки модели");
