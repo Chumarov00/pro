@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8" />
-  <title>WebAR: Фиксация модели</title>
+  <title>WebAR: Фиксация модели1</title>
   <style>
     html, body {
       margin: 0;
@@ -55,6 +55,7 @@
 <div id="log">🔍 Загружается...</div>
 <button id="fixBtn">📌 Зафиксировать</button>
 
+<!-- Three.js и GLTFLoader -->
 <script src="https://cdn.jsdelivr.net/npm/three@0.150.1/build/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.150.1/examples/js/loaders/GLTFLoader.js"></script>
 
@@ -95,34 +96,28 @@ function initScene() {
   scene.add(light);
 
   const loader = new THREE.GLTFLoader();
- loader.load(
-  "model.glb",
-  function(gltf) {
-    model = gltf.scene;
+  loader.load(
+    "model.glb",  // Убедись, что этот файл находится в той же папке
+    function(gltf) {
+      model = gltf.scene;
 
-    const box = new THREE.Box3().setFromObject(model);
-    const center = box.getCenter(new THREE.Vector3());
-    const size = box.getSize(new THREE.Vector3()).length();
-    const scale = 1 / size * 0.5;
+      const box = new THREE.Box3().setFromObject(model);
+      const center = box.getCenter(new THREE.Vector3());
+      const size = box.getSize(new THREE.Vector3()).length();
+      const scale = 1 / size * 0.5;
 
-    model.position.sub(center);
-    model.scale.setScalar(scale);
-    model.position.z = -1.5;
+      model.position.sub(center);
+      model.scale.setScalar(scale);
+      model.position.z = -1.5;
 
-    scene.add(model);
-    logMsg("✅ Модель загружена");
-    animate();
-  },
-  undefined,
-  function(error) {
-    logMsg("❌ Ошибка загрузки модели: " + error.message || error);
-    console.error("Ошибка загрузки модели:", error);
-  }
-);
+      scene.add(model);
+      logMsg("✅ Модель загружена");
+      animate();
+    },
     undefined,
     function(error) {
-      logMsg("❌ Ошибка загрузки модели");
-      console.error(error);
+      logMsg("❌ Ошибка загрузки модели: " + (error.message || error));
+      console.error("Ошибка загрузки модели:", error);
     }
   );
 
