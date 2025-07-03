@@ -2,85 +2,38 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8" />
-  <title>WebAR: Фиксация модели</title>
+  <title>WebAR Test — Куб</title>
   <style>
-    html, body {
-      margin: 0;
-      overflow: hidden;
-      background: black;
-    }
+    html, body { margin: 0; overflow: hidden; background: black; }
     video {
       position: fixed;
-      top: 0;
-      left: 0;
-      width: 100vw;
-      height: 100vh;
+      top: 0; left: 0;
+      width: 100vw; height: 100vh;
       object-fit: cover;
       z-index: -1;
     }
     canvas {
       position: absolute;
-      top: 0;
-      left: 0;
-    }
-    #log {
-      position: absolute;
-      top: 10px;
-      left: 10px;
-      color: white;
-      background: rgba(0,0,0,0.5);
-      padding: 5px 10px;
-      font-family: monospace;
-      z-index: 99;
-    }
-    #fixBtn {
-      position: absolute;
-      bottom: 20px;
-      left: 50%;
-      transform: translateX(-50%);
-      padding: 12px 24px;
-      font-size: 16px;
-      background: #2196f3;
-      color: white;
-      border: none;
-      border-radius: 8px;
-      z-index: 100;
-      cursor: pointer;
+      top: 0; left: 0;
     }
   </style>
 </head>
 <body>
 
 <video id="video" autoplay muted playsinline></video>
-<div id="log">🔍 Загружается...</div>
-<button id="fixBtn">📌 Зафиксировать</button>
 
-<!-- Three.js и GLTFLoader -->
 <script src="https://cdn.jsdelivr.net/npm/three@0.150.1/build/three.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/three@0.150.1/examples/js/loaders/GLTFLoader.js"></script>
 
 <script>
-let model = null;
-let isFixed = false;
-
-const log = document.getElementById("log");
-const fixBtn = document.getElementById("fixBtn");
 const video = document.getElementById("video");
 
-function logMsg(msg) {
-  log.textContent = msg;
-  console.log(msg);
-}
-
-// Получаем доступ к камере
 navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
   .then(stream => {
-    logMsg("📷 Камера работает");
     video.srcObject = stream;
     initScene();
   })
   .catch(err => {
-    logMsg("❌ Ошибка камеры: " + err.name);
+    alert("Ошибка камеры: " + err.name);
   });
 
 function initScene() {
@@ -92,58 +45,22 @@ function initScene() {
   renderer.setSize(window.innerWidth, window.innerHeight);
   document.body.appendChild(renderer.domElement);
 
-  const light = new THREE.AmbientLight(0xffffff, 1.2);
+  const light = new THREE.AmbientLight(0xffffff);
   scene.add(light);
 
-  const loader = new THREE.GLTFLoader();
-  loader.load(
-    // 🔗 Абсолютный путь к твоей модели на GitHub Pages:
-    'https://raw.githubusercontent.com/mrdoob/three.js/dev/examples/models/gltf/Box.glb',
-    function(gltf) {
-      model = gltf.scene;
+  // 📦 Создаем куб прямо здесь, без загрузки
+  const geometry = new THREE.BoxGeometry();
+  const material = new THREE.MeshNormalMaterial();
+  const cube = new THREE.Mesh(geometry, material);
+  scene.add(cube);
 
-      const box = new THREE.Box3().setFromObject(model);
-      const center = box.getCenter(new THREE.Vector3());
-      const size = box.getSize(new THREE.Vector3()).length();
-      const scale = 1 / size * 0.5;
-
-      model.position.sub(center);
-      model.scale.setScalar(scale);
-      model.position.z = -1.5;
-
-      scene.add(model);
-      logMsg("✅ Модель загружена");
-      animate();
-    },
-    undefined,
-    function(error) {
-      logMsg("❌ Ошибка загрузки модели");
-      console.error(error);
-    }
-  );
-
-  fixBtn.addEventListener("click", () => {
-    isFixed = true;
-    logMsg("📌 Модель зафиксирована");
-  });
-
+  // Анимация
   function animate() {
     requestAnimationFrame(animate);
-
-    if (model && !isFixed) {
-      const camDir = new THREE.Vector3();
-      camera.getWorldDirection(camDir);
-      model.position.copy(camera.position).add(camDir.multiplyScalar(1.5));
-    }
-
+    cube.rotation.y += 0.01;
     renderer.render(scene, camera);
   }
-
-  window.addEventListener("resize", () => {
-    camera.aspect = window.innerWidth / window.innerHeight;
-    camera.updateProjectionMatrix();
-    renderer.setSize(window.innerWidth, window.innerHeight);
-  });
+  animate();
 }
 </script>
 
