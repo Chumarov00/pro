@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8" />
-  <title>WebAR: Фиксация модели1</title>
+  <title>WebAR: Фиксация модели</title>
   <style>
     html, body {
       margin: 0;
@@ -55,7 +55,7 @@
 <div id="log">🔍 Загружается...</div>
 <button id="fixBtn">📌 Зафиксировать</button>
 
-<!-- Рабочие версии Three.js и GLTFLoader -->
+<!-- Старые стабильные версии Three.js и GLTFLoader -->
 <script src="https://cdn.jsdelivr.net/npm/three@0.145.0/build/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.145.0/examples/js/loaders/GLTFLoader.js"></script>
 
@@ -85,6 +85,7 @@ navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
   });
 
 function initScene() {
+  logMsg("🧱 Создание сцены...");
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 100);
   camera.position.z = 2;
@@ -93,11 +94,12 @@ function initScene() {
   renderer.setSize(window.innerWidth, window.innerHeight);
   document.body.appendChild(renderer.domElement);
 
-  scene.add(new THREE.AmbientLight(0xffffff, 1.2));
+  const light = new THREE.AmbientLight(0xffffff, 1.2);
+  scene.add(light);
 
   const loader = new THREE.GLTFLoader();
   loader.load(
-    'model.glb', // Файл должен лежать рядом с этим HTML
+    'model.glb', // замените путь при необходимости
     gltf => {
       model = gltf.scene;
 
@@ -119,23 +121,27 @@ function initScene() {
       logMsg(`📦 Загрузка: ${percent.toFixed(1)}%`);
     },
     error => {
-      logMsg("❌ Ошибка загрузки модели: " + error.message || error);
+      logMsg("❌ Ошибка загрузки модели: " + (error.message || error));
       console.error(error);
     }
   );
 
   fixBtn.addEventListener("click", () => {
     isFixed = true;
+    fixBtn.textContent = "✅ Зафиксировано";
+    fixBtn.style.background = "#4caf50";
     logMsg("📌 Модель зафиксирована");
   });
 
   function animate() {
     requestAnimationFrame(animate);
 
-    if (model && !isFixed) {
-      const direction = new THREE.Vector3();
-      camera.getWorldDirection(direction);
-      model.position.copy(camera.position).add(direction.multiplyScalar(1.5));
+    if (model) {
+      if (!isFixed) {
+        const direction = new THREE.Vector3();
+        camera.getWorldDirection(direction);
+        model.position.copy(camera.position).add(direction.multiplyScalar(1.5));
+      }
     }
 
     renderer.render(scene, camera);
