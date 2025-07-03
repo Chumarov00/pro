@@ -55,9 +55,9 @@
 <div id="log">🔍 Загружается...</div>
 <button id="fixBtn">📌 Зафиксировать</button>
 
-<!-- Three.js и GLTFLoader -->
-<script src="https://cdn.jsdelivr.net/npm/three@0.150.1/build/three.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/three@0.150.1/examples/js/loaders/GLTFLoader.js"></script>
+<!-- Рабочие версии Three.js и GLTFLoader -->
+<script src="https://cdn.jsdelivr.net/npm/three@0.145.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.145.0/examples/js/loaders/GLTFLoader.js"></script>
 
 <script>
 let model = null;
@@ -72,25 +72,19 @@ function logMsg(msg) {
   console.log(msg);
 }
 
-// Получаем доступ к камере
+// Камера
 navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
   .then(stream => {
     logMsg("📷 Камера работает");
     video.srcObject = stream;
-    try {
-      initScene();
-    } catch (e) {
-      logMsg("❌ Ошибка при инициализации сцены: " + e.message);
-      console.error("Ошибка инициализации сцены:", e);
-    }
+    initScene();
   })
   .catch(err => {
-    logMsg("❌ Не удалось получить доступ к камере: " + err.name + " - " + err.message);
-    console.error("Ошибка доступа к камере:", err);
+    logMsg("❌ Ошибка камеры: " + err.name + " - " + err.message);
+    console.error(err);
   });
 
 function initScene() {
-  logMsg("🧱 Создание сцены...");
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 100);
   camera.position.z = 2;
@@ -99,39 +93,34 @@ function initScene() {
   renderer.setSize(window.innerWidth, window.innerHeight);
   document.body.appendChild(renderer.domElement);
 
-  const light = new THREE.AmbientLight(0xffffff, 1.2);
-  scene.add(light);
+  scene.add(new THREE.AmbientLight(0xffffff, 1.2));
 
   const loader = new THREE.GLTFLoader();
   loader.load(
-    "model.glb", // Модель должна быть в той же папке, что и этот HTML
-    function (gltf) {
-      try {
-        model = gltf.scene;
+    'model.glb', // Файл должен лежать рядом с этим HTML
+    gltf => {
+      model = gltf.scene;
 
-        const box = new THREE.Box3().setFromObject(model);
-        const center = box.getCenter(new THREE.Vector3());
-        const size = box.getSize(new THREE.Vector3()).length();
-        const scale = 1 / size * 0.5;
+      const box = new THREE.Box3().setFromObject(model);
+      const center = box.getCenter(new THREE.Vector3());
+      const size = box.getSize(new THREE.Vector3()).length();
+      const scale = 1 / size * 0.5;
 
-        model.position.sub(center);
-        model.scale.setScalar(scale);
-        model.position.z = -1.5;
+      model.position.sub(center);
+      model.scale.setScalar(scale);
+      model.position.z = -1.5;
 
-        scene.add(model);
-        logMsg("✅ Модель загружена и добавлена в сцену");
-        animate();
-      } catch (e) {
-        logMsg("❌ Ошибка при обработке модели: " + e.message);
-        console.error("Ошибка при обработке модели:", e);
-      }
+      scene.add(model);
+      logMsg("✅ Модель загружена");
+      animate();
     },
-    function (xhr) {
-      logMsg(`📦 Загрузка модели: ${((xhr.loaded / xhr.total) * 100).toFixed(1)}%`);
+    xhr => {
+      const percent = (xhr.loaded / xhr.total) * 100;
+      logMsg(`📦 Загрузка: ${percent.toFixed(1)}%`);
     },
-    function (error) {
-      logMsg("❌ Ошибка загрузки модели: " + (error.message || error));
-      console.error("Ошибка загрузки модели:", error);
+    error => {
+      logMsg("❌ Ошибка загрузки модели: " + error.message || error);
+      console.error(error);
     }
   );
 
@@ -144,9 +133,9 @@ function initScene() {
     requestAnimationFrame(animate);
 
     if (model && !isFixed) {
-      const camDir = new THREE.Vector3();
-      camera.getWorldDirection(camDir);
-      model.position.copy(camera.position).add(camDir.multiplyScalar(1.5));
+      const direction = new THREE.Vector3();
+      camera.getWorldDirection(direction);
+      model.position.copy(camera.position).add(direction.multiplyScalar(1.5));
     }
 
     renderer.render(scene, camera);
