@@ -1,50 +1,148 @@
 <!DOCTYPE html>
-<html>
+<html lang="ru">
 <head>
-  <meta charset="UTF-8">
-  <title>MindAR + GLB</title>
-  <script src="https://cdn.jsdelivr.net/npm/three@0.150.1/build/three.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/three@0.150.1/examples/js/loaders/GLTFLoader.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.1.4/dist/mindar-image-three.prod.js"></script>
+  <meta charset="UTF-8" />
+  <title>WebAR: Фиксация модели</title>
   <style>
-    body { margin: 0; overflow: hidden; }
-    canvas { position: absolute; top: 0; left: 0; }
+    html, body {
+      margin: 0;
+      overflow: hidden;
+      background: black;
+    }
+    video {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      object-fit: cover;
+      z-index: -1;
+    }
+    canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+    }
+    #log {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      color: white;
+      background: rgba(0,0,0,0.5);
+      padding: 5px 10px;
+      font-family: monospace;
+      z-index: 99;
+    }
+    #fixBtn {
+      position: absolute;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      padding: 12px 24px;
+      font-size: 16px;
+      background: #2196f3;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      z-index: 100;
+      cursor: pointer;
+    }
   </style>
 </head>
 <body>
 
+<video id="video" autoplay muted playsinline></video>
+<div id="log">🔍 Загружается...</div>
+<button id="fixBtn">📌 Зафиксировать</button>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.150.1/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.150.1/examples/js/loaders/GLTFLoader.js"></script>
+
 <script>
-document.addEventListener("DOMContentLoaded", async () => {
-  const mindarThree = new window.MINDAR.IMAGE.MindARThree({
-    container: document.body,
-    imageTargetSrc: "https://chumarov00.github.io/pro/your_marker.mind", // готовый маркер
-    maxTrack: 1
+let model = null;
+let isFixed = false;
+
+const log = document.getElementById("log");
+const fixBtn = document.getElementById("fixBtn");
+const video = document.getElementById("video");
+
+function logMsg(msg) {
+  log.textContent = msg;
+  console.log(msg);
+}
+
+// Получаем доступ к камере
+navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
+  .then(stream => {
+    logMsg("📷 Камера работает");
+    video.srcObject = stream;
+    initScene();
+  })
+  .catch(err => {
+    logMsg("❌ Ошибка камеры: " + err.name);
   });
 
-  const { renderer, scene, camera } = mindarThree;
-  const anchor = mindarThree.addAnchor(0);
+function initScene() {
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 100);
+  camera.position.z = 2;
+
+  const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  document.body.appendChild(renderer.domElement);
+
+  const light = new THREE.AmbientLight(0xffffff, 1.2);
+  scene.add(light);
 
   const loader = new THREE.GLTFLoader();
+  loader.load(
+    "model.glb",  // 💡 здесь укажи путь к своей модели
+    function(gltf) {
+      model = gltf.scene;
 
-  loader.load("https://chumarov00.github.io/pro/model.glb", function(gltf) {
-    const model = gltf.scene;
+      const box = new THREE.Box3().setFromObject(model);
+      const center = box.getCenter(new THREE.Vector3());
+      const size = box.getSize(new THREE.Vector3()).length();
+      const scale = 1 / size * 0.5;
 
-    // масштаб и центрирование
-    const box = new THREE.Box3().setFromObject(model);
-    const center = box.getCenter(new THREE.Vector3());
-    model.position.sub(center);
-    model.scale.setScalar(0.5); // уменьшаем
+      model.position.sub(center);
+      model.scale.setScalar(scale);
+      model.position.z = -1.5;
 
-    anchor.group.add(model);
-  }, undefined, function(error) {
-    console.error("Ошибка загрузки GLB:", error);
+      scene.add(model);
+      logMsg("✅ Модель загружена");
+      animate();
+    },
+    undefined,
+    function(error) {
+      logMsg("❌ Ошибка загрузки модели");
+      console.error(error);
+    }
+  );
+
+  fixBtn.addEventListener("click", () => {
+    isFixed = true;
+    logMsg("📌 Модель зафиксирована");
   });
 
-  await mindarThree.start();
-  renderer.setAnimationLoop(() => {
+  function animate() {
+    requestAnimationFrame(animate);
+
+    if (model && !isFixed) {
+      const camDir = new THREE.Vector3();
+      camera.getWorldDirection(camDir);
+      model.position.copy(camera.position).add(camDir.multiplyScalar(1.5));
+    }
+
     renderer.render(scene, camera);
+  }
+
+  window.addEventListener("resize", () => {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
   });
-});
+}
 </script>
 
 </body>
