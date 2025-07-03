@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8" />
-  <title>WebAR: Фиксация модели1</title>
+  <title>WebAR: Фиксация модели</title>
   <style>
     html, body {
       margin: 0;
@@ -28,7 +28,7 @@
       top: 10px;
       left: 10px;
       color: white;
-      background: rgba(0,0,0,0.5);
+      background: rgba(0,0,0,0.6);
       padding: 5px 10px;
       font-family: monospace;
       z-index: 99;
@@ -77,13 +77,20 @@ navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
   .then(stream => {
     logMsg("📷 Камера работает");
     video.srcObject = stream;
-    initScene();
+    try {
+      initScene();
+    } catch (e) {
+      logMsg("❌ Ошибка при инициализации сцены: " + e.message);
+      console.error("Ошибка инициализации сцены:", e);
+    }
   })
   .catch(err => {
-    logMsg("❌ Ошибка камеры: " + err.name);
+    logMsg("❌ Не удалось получить доступ к камере: " + err.name + " - " + err.message);
+    console.error("Ошибка доступа к камере:", err);
   });
 
 function initScene() {
+  logMsg("🧱 Создание сцены...");
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 100);
   camera.position.z = 2;
@@ -97,25 +104,32 @@ function initScene() {
 
   const loader = new THREE.GLTFLoader();
   loader.load(
-    "model.glb",  // Убедись, что этот файл находится в той же папке
-    function(gltf) {
-      model = gltf.scene;
+    "model.glb", // Модель должна быть в той же папке, что и этот HTML
+    function (gltf) {
+      try {
+        model = gltf.scene;
 
-      const box = new THREE.Box3().setFromObject(model);
-      const center = box.getCenter(new THREE.Vector3());
-      const size = box.getSize(new THREE.Vector3()).length();
-      const scale = 1 / size * 0.5;
+        const box = new THREE.Box3().setFromObject(model);
+        const center = box.getCenter(new THREE.Vector3());
+        const size = box.getSize(new THREE.Vector3()).length();
+        const scale = 1 / size * 0.5;
 
-      model.position.sub(center);
-      model.scale.setScalar(scale);
-      model.position.z = -1.5;
+        model.position.sub(center);
+        model.scale.setScalar(scale);
+        model.position.z = -1.5;
 
-      scene.add(model);
-      logMsg("✅ Модель загружена");
-      animate();
+        scene.add(model);
+        logMsg("✅ Модель загружена и добавлена в сцену");
+        animate();
+      } catch (e) {
+        logMsg("❌ Ошибка при обработке модели: " + e.message);
+        console.error("Ошибка при обработке модели:", e);
+      }
     },
-    undefined,
-    function(error) {
+    function (xhr) {
+      logMsg(`📦 Загрузка модели: ${((xhr.loaded / xhr.total) * 100).toFixed(1)}%`);
+    },
+    function (error) {
       logMsg("❌ Ошибка загрузки модели: " + (error.message || error));
       console.error("Ошибка загрузки модели:", error);
     }
