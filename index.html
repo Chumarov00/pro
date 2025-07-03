@@ -1,67 +1,50 @@
 <!DOCTYPE html>
-<html lang="ru">
+<html>
 <head>
-  <meta charset="UTF-8" />
-  <title>WebAR Test — Куб</title>
+  <meta charset="UTF-8">
+  <title>MindAR + GLB</title>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.150.1/build/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.150.1/examples/js/loaders/GLTFLoader.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.1.4/dist/mindar-image-three.prod.js"></script>
   <style>
-    html, body { margin: 0; overflow: hidden; background: black; }
-    video {
-      position: fixed;
-      top: 0; left: 0;
-      width: 100vw; height: 100vh;
-      object-fit: cover;
-      z-index: -1;
-    }
-    canvas {
-      position: absolute;
-      top: 0; left: 0;
-    }
+    body { margin: 0; overflow: hidden; }
+    canvas { position: absolute; top: 0; left: 0; }
   </style>
 </head>
 <body>
 
-<video id="video" autoplay muted playsinline></video>
-
-<script src="https://cdn.jsdelivr.net/npm/three@0.150.1/build/three.min.js"></script>
-
 <script>
-const video = document.getElementById("video");
-
-navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
-  .then(stream => {
-    video.srcObject = stream;
-    initScene();
-  })
-  .catch(err => {
-    alert("Ошибка камеры: " + err.name);
+document.addEventListener("DOMContentLoaded", async () => {
+  const mindarThree = new window.MINDAR.IMAGE.MindARThree({
+    container: document.body,
+    imageTargetSrc: "https://chumarov00.github.io/pro/your_marker.mind", // готовый маркер
+    maxTrack: 1
   });
 
-function initScene() {
-  const scene = new THREE.Scene();
-  const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 100);
-  camera.position.z = 2;
+  const { renderer, scene, camera } = mindarThree;
+  const anchor = mindarThree.addAnchor(0);
 
-  const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
-  renderer.setSize(window.innerWidth, window.innerHeight);
-  document.body.appendChild(renderer.domElement);
+  const loader = new THREE.GLTFLoader();
 
-  const light = new THREE.AmbientLight(0xffffff);
-  scene.add(light);
+  loader.load("https://chumarov00.github.io/pro/model.glb", function(gltf) {
+    const model = gltf.scene;
 
-  // 📦 Создаем куб прямо здесь, без загрузки
-  const geometry = new THREE.BoxGeometry();
-  const material = new THREE.MeshNormalMaterial();
-  const cube = new THREE.Mesh(geometry, material);
-  scene.add(cube);
+    // масштаб и центрирование
+    const box = new THREE.Box3().setFromObject(model);
+    const center = box.getCenter(new THREE.Vector3());
+    model.position.sub(center);
+    model.scale.setScalar(0.5); // уменьшаем
 
-  // Анимация
-  function animate() {
-    requestAnimationFrame(animate);
-    cube.rotation.y += 0.01;
+    anchor.group.add(model);
+  }, undefined, function(error) {
+    console.error("Ошибка загрузки GLB:", error);
+  });
+
+  await mindarThree.start();
+  renderer.setAnimationLoop(() => {
     renderer.render(scene, camera);
-  }
-  animate();
-}
+  });
+});
 </script>
 
 </body>
