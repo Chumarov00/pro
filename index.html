@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8" />
-  <title>WebAR: Фиксация модели</title>
+  <title>WebAR: Фиксация модели1</title>
   <style>
     html, body {
       margin: 0;
@@ -55,13 +55,14 @@
 <div id="log">🔍 Загружается...</div>
 <button id="fixBtn">📌 Зафиксировать</button>
 
-<!-- Старые стабильные версии Three.js и GLTFLoader -->
+<!-- Three.js + GLTFLoader (старые стабильные версии) -->
 <script src="https://cdn.jsdelivr.net/npm/three@0.145.0/build/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.145.0/examples/js/loaders/GLTFLoader.js"></script>
 
 <script>
 let model = null;
 let isFixed = false;
+let fixedPosition = null;
 
 const log = document.getElementById("log");
 const fixBtn = document.getElementById("fixBtn");
@@ -99,10 +100,11 @@ function initScene() {
 
   const loader = new THREE.GLTFLoader();
   loader.load(
-    'model.glb', // замените путь при необходимости
+    'model.glb', // Замените на путь к своей модели
     gltf => {
       model = gltf.scene;
 
+      // Центрируем и масштабируем
       const box = new THREE.Box3().setFromObject(model);
       const center = box.getCenter(new THREE.Vector3());
       const size = box.getSize(new THREE.Vector3()).length();
@@ -128,6 +130,9 @@ function initScene() {
 
   fixBtn.addEventListener("click", () => {
     isFixed = true;
+    if (model) {
+      fixedPosition = model.position.clone(); // Сохраняем позицию
+    }
     fixBtn.textContent = "✅ Зафиксировано";
     fixBtn.style.background = "#4caf50";
     logMsg("📌 Модель зафиксирована");
@@ -141,6 +146,8 @@ function initScene() {
         const direction = new THREE.Vector3();
         camera.getWorldDirection(direction);
         model.position.copy(camera.position).add(direction.multiplyScalar(1.5));
+      } else if (fixedPosition) {
+        model.position.copy(fixedPosition);
       }
     }
 
