@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8" />
-  <title>WebAR: Фиксация модели</title>
+  <title>WebAR: Отладка фиксации модели</title>
   <style>
     html, body {
       margin: 0;
@@ -23,15 +23,24 @@
       top: 0;
       left: 0;
     }
-    #log {
+    #log, #debug {
       position: absolute;
-      top: 10px;
       left: 10px;
-      color: white;
-      background: rgba(0,0,0,0.6);
-      padding: 5px 10px;
       font-family: monospace;
+      padding: 6px 10px;
       z-index: 99;
+      color: white;
+    }
+    #log {
+      top: 10px;
+      background: rgba(0,0,0,0.6);
+    }
+    #debug {
+      top: 60px;
+      background: rgba(0, 0, 0, 0.4);
+      font-size: 12px;
+      max-width: 80vw;
+      white-space: pre-wrap;
     }
     #fixBtn {
       position: absolute;
@@ -53,9 +62,10 @@
 
 <video id="video" autoplay muted playsinline></video>
 <div id="log">🔍 Загружается...</div>
+<div id="debug">⏳</div>
 <button id="fixBtn">📌 Зафиксировать</button>
 
-<!-- Стабильная версия Three.js и GLTFLoader -->
+<!-- Three.js и GLTFLoader -->
 <script src="https://cdn.jsdelivr.net/npm/three@0.145.0/build/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.145.0/examples/js/loaders/GLTFLoader.js"></script>
 
@@ -64,15 +74,20 @@ let model = null;
 let isFixed = false;
 
 const log = document.getElementById("log");
+const debug = document.getElementById("debug");
 const fixBtn = document.getElementById("fixBtn");
 const video = document.getElementById("video");
 
 function logMsg(msg) {
   log.textContent = msg;
-  console.log(msg);
+  console.log("[LOG]", msg);
 }
 
-// Камера
+function debugMsg(msg) {
+  debug.textContent = msg;
+  console.log("[DEBUG]", msg);
+}
+
 navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
   .then(stream => {
     logMsg("📷 Камера работает");
@@ -80,7 +95,7 @@ navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
     initScene();
   })
   .catch(err => {
-    logMsg("❌ Ошибка камеры: " + err.name + " - " + err.message);
+    logMsg("❌ Ошибка камеры: " + err.name);
     console.error(err);
   });
 
@@ -99,11 +114,10 @@ function initScene() {
 
   const loader = new THREE.GLTFLoader();
   loader.load(
-    'model.glb', // Замени на путь к своей модели
+    'model.glb', // укажи свой путь к файлу здесь
     gltf => {
       model = gltf.scene;
 
-      // Центрирование и масштабирование
       const box = new THREE.Box3().setFromObject(model);
       const center = box.getCenter(new THREE.Vector3());
       const size = box.getSize(new THREE.Vector3()).length();
@@ -122,7 +136,7 @@ function initScene() {
       logMsg(`📦 Загрузка: ${percent.toFixed(1)}%`);
     },
     error => {
-      logMsg("❌ Ошибка загрузки модели: " + (error.message || error));
+      logMsg("❌ Ошибка загрузки модели");
       console.error(error);
     }
   );
@@ -132,6 +146,13 @@ function initScene() {
     fixBtn.textContent = "✅ Зафиксировано";
     fixBtn.style.background = "#4caf50";
     logMsg("📌 Модель зафиксирована");
+
+    if (model) {
+      const pos = model.position;
+      debugMsg(`🔒 Зафиксировано на: x=${pos.x.toFixed(2)}, y=${pos.y.toFixed(2)}, z=${pos.z.toFixed(2)}`);
+    } else {
+      debugMsg("⚠️ Модель ещё не загружена");
+    }
   });
 
   function animate() {
@@ -142,9 +163,11 @@ function initScene() {
         const direction = new THREE.Vector3();
         camera.getWorldDirection(direction);
         const targetPosition = camera.position.clone().add(direction.multiplyScalar(1.5));
-        model.position.lerp(targetPosition, 0.15); // Плавное движение к цели
+        model.position.lerp(targetPosition, 0.15);
+        debugMsg(`🎯 Следим: x=${model.position.x.toFixed(2)}, y=${model.position.y.toFixed(2)}, z=${model.position.z.toFixed(2)}`);
+      } else {
+        debugMsg(`🛑 Зафиксировано: x=${model.position.x.toFixed(2)}, y=${model.position.y.toFixed(2)}, z=${model.position.z.toFixed(2)}`);
       }
-      // Если isFixed — ничего не делаем, позиция остаётся
     }
 
     renderer.render(scene, camera);
