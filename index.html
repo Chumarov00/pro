@@ -2,32 +2,24 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8" />
-  <title>WebAR с фиксацией</title>
+  <title>WebAR — фиксация модели</title>
   <style>
-    html, body {
-      margin: 0;
-      overflow: hidden;
-      background: black;
-    }
-    video {
+    html, body { margin: 0; overflow: hidden; background: black; }
+    video, canvas {
       position: fixed;
       top: 0; left: 0;
-      width: 100vw; height: 100vh;
+      width: 100vw;
+      height: 100vh;
       object-fit: cover;
       z-index: -1;
-    }
-    canvas {
-      position: absolute;
-      top: 0;
-      left: 0;
     }
     #log {
       position: absolute;
       top: 10px;
       left: 10px;
+      padding: 8px 12px;
       color: white;
       background: rgba(0,0,0,0.5);
-      padding: 5px 10px;
       font-family: monospace;
       z-index: 10;
     }
@@ -36,21 +28,19 @@
       bottom: 20px;
       left: 50%;
       transform: translateX(-50%);
-      padding: 12px 24px;
-      font-size: 16px;
+      padding: 10px 20px;
       background: #2196f3;
       color: white;
       border: none;
       border-radius: 8px;
-      z-index: 10;
-      cursor: pointer;
+      font-size: 16px;
+      z-index: 11;
     }
   </style>
 </head>
 <body>
 
 <video id="video" autoplay muted playsinline></video>
-<canvas id="canvas"></canvas>
 <div id="log">🔍 Загружается...</div>
 <button id="fixBtn">📌 Зафиксировать</button>
 
@@ -58,50 +48,48 @@
 <script src="https://cdn.jsdelivr.net/npm/three@0.150.1/examples/js/loaders/GLTFLoader.js"></script>
 
 <script>
-let scene, camera, renderer;
 let model = null;
 let isFixed = false;
+let fixedPosition = new THREE.Vector3();
+
 const log = document.getElementById("log");
 const fixBtn = document.getElementById("fixBtn");
 const video = document.getElementById("video");
 
-// Лог
 function logMsg(msg) {
   log.textContent = msg;
   console.log("[LOG]", msg);
 }
 
-// Подключаем камеру
+// Получаем доступ к камере
 navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
-  .then((stream) => {
-    logMsg("📷 Камера работает");
+  .then(stream => {
     video.srcObject = stream;
+    logMsg("📷 Камера работает");
     initScene();
   })
-  .catch((err) => {
+  .catch(err => {
     logMsg("❌ Ошибка камеры: " + err.name);
   });
 
-// Инициализация сцены
 function initScene() {
   logMsg("🧱 Создание сцены...");
 
-  scene = new THREE.Scene();
-  camera = new THREE.PerspectiveCamera(
-    70, window.innerWidth / window.innerHeight, 0.01, 100
-  );
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 100);
   camera.position.z = 2;
 
-  renderer = new THREE.WebGLRenderer({ canvas: document.getElementById("canvas"), alpha: true, antialias: true });
+  const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
   renderer.setSize(window.innerWidth, window.innerHeight);
+  document.body.appendChild(renderer.domElement);
 
-  scene.add(new THREE.AmbientLight(0xffffff, 1.5));
+  const light = new THREE.AmbientLight(0xffffff, 1.2);
+  scene.add(light);
 
-  // Загрузка модели
   const loader = new THREE.GLTFLoader();
   loader.load(
-    'model.glb', // замени путь, если твоя модель в другом месте
-    function (gltf) {
+    "model.glb", // твоя модель
+    function(gltf) {
       model = gltf.scene;
 
       const box = new THREE.Box3().setFromObject(model);
@@ -111,32 +99,45 @@ function initScene() {
 
       model.position.sub(center);
       model.scale.setScalar(scale);
-      model.position.z = -1.5;
-
       scene.add(model);
+
       logMsg("✅ Модель загружена");
       animate();
     },
-    undefined,
-    function (error) {
+    (xhr) => {
+      const percent = ((xhr.loaded / xhr.total) * 100).toFixed(1);
+      logMsg(`📦 Загрузка: ${percent}%`);
+    },
+    function(error) {
       logMsg("❌ Ошибка загрузки модели");
       console.error(error);
     }
   );
 
   fixBtn.addEventListener("click", () => {
-    if (!model) return;
-
     isFixed = true;
+    if (model) fixedPosition.copy(model.position);
     logMsg("📌 Модель зафиксирована");
-
-    const marker = new THREE.Mesh(
-      new THREE.BoxGeometry(0.05, 0.05, 0.05),
-      new THREE.MeshBasicMaterial({ color: 0xff0000 })
-    );
-    marker.position.copy(model.position);
-    scene.add(marker);
+    console.log("[DEBUG] Зафиксировано:", fixedPosition);
   });
+
+  function animate() {
+    requestAnimationFrame(animate);
+
+    if (model) {
+      if (!isFixed) {
+        const camDir = new THREE.Vector3();
+        camera.getWorldDirection(camDir);
+        model.position.copy(camera.position).add(camDir.multiplyScalar(1.5));
+        console.log("[DEBUG] Следим:", model.position);
+      } else {
+        model.position.copy(fixedPosition);
+        console.log("[DEBUG] Зафиксировано:", model.position);
+      }
+    }
+
+    renderer.render(scene, camera);
+  }
 
   window.addEventListener("resize", () => {
     camera.aspect = window.innerWidth / window.innerHeight;
@@ -144,18 +145,7 @@ function initScene() {
     renderer.setSize(window.innerWidth, window.innerHeight);
   });
 }
-
-// Отрисовка
-function animate() {
-  requestAnimationFrame(animate);
-
-  if (model && !isFixed) {
-    model.rotation.y += 0.01;
-    model.rotation.x += 0.005;
-  }
-
-  renderer.render(scene, camera);
-}
 </script>
+
 </body>
 </html>
