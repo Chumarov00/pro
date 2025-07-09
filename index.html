@@ -2,17 +2,12 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8" />
-  <title>WebAR Debug</title>
+  <title>WebAR с движением</title>
   <style>
-    html, body {
-      margin: 0;
-      overflow: hidden;
-      background: black;
-    }
+    html, body { margin: 0; overflow: hidden; background: black; }
     video, canvas {
       position: fixed;
-      top: 0;
-      left: 0;
+      top: 0; left: 0;
       width: 100vw;
       height: 100vh;
       object-fit: cover;
@@ -37,8 +32,9 @@
 <div id="log">🔍 Загрузка...</div>
 <div id="debug">⏳</div>
 
-<!-- Three.js и GLTFLoader -->
+<!-- Three.js + контроллеры -->
 <script src="https://cdn.jsdelivr.net/npm/three@0.145.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.145.0/examples/js/controls/DeviceOrientationControls.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.145.0/examples/js/loaders/GLTFLoader.js"></script>
 
 <script>
@@ -47,6 +43,7 @@ const debug = document.getElementById("debug");
 const video = document.getElementById("video");
 
 let model = null;
+let controls;
 
 function logMsg(msg) {
   log.textContent = msg;
@@ -57,7 +54,7 @@ function debugMsg(msg) {
   console.log("[DEBUG]", msg);
 }
 
-// Запуск камеры
+// 1. Камера
 navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
   .then(stream => {
     logMsg("📷 Камера работает");
@@ -80,9 +77,14 @@ function initScene() {
   renderer.setSize(window.innerWidth, window.innerHeight);
   document.body.appendChild(renderer.domElement);
 
-  const light = new THREE.AmbientLight(0xffffff, 2);
+  // 2. Управление ориентацией
+  controls = new THREE.DeviceOrientationControls(camera);
+
+  // 3. Свет
+  const light = new THREE.AmbientLight(0xffffff, 1.5);
   scene.add(light);
 
+  // 4. Загрузка модели
   const loader = new THREE.GLTFLoader();
   loader.load(
     'https://chumarov00.github.io/pro/model.glb',
@@ -100,6 +102,7 @@ function initScene() {
 
       scene.add(model);
       logMsg("✅ Модель загружена");
+
       animate();
     },
     xhr => {
@@ -114,9 +117,13 @@ function initScene() {
 
   function animate() {
     requestAnimationFrame(animate);
+    controls.update(); // Обновляем ориентацию камеры
+
     if (model) {
-      debugMsg(`📍 Позиция: x=${model.position.x.toFixed(2)} y=${model.position.y.toFixed(2)} z=${model.position.z.toFixed(2)}`);
+      const pos = model.position;
+      debugMsg(`📍 Модель: x=${pos.x.toFixed(2)} y=${pos.y.toFixed(2)} z=${pos.z.toFixed(2)}\n🎥 Камера: rotX=${camera.rotation.x.toFixed(2)} rotY=${camera.rotation.y.toFixed(2)}`);
     }
+
     renderer.render(scene, camera);
   }
 
