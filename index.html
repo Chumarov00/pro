@@ -2,140 +2,99 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8" />
-  <title>WebAR: Фиксация модели</title>
+  <title>WebAR</title>
   <style>
-    html, body {
-      margin: 0;
-      overflow: hidden;
-      background: black;
-    }
+    html, body { margin: 0; overflow: hidden; background: black; }
     video, canvas {
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100vw;
-      height: 100vh;
-      object-fit: cover;
-      z-index: -1;
+      position: fixed; top: 0; left: 0;
+      width: 100vw; height: 100vh;
+      object-fit: cover; z-index: -1;
     }
     #log, #debug {
-      position: absolute;
-      left: 10px;
+      position: absolute; left: 10px;
       font-family: monospace;
-      padding: 6px 10px;
+      padding: 6px 10px; color: white;
       z-index: 99;
-      color: white;
     }
     #log { top: 10px; background: rgba(0,0,0,0.6); }
-    #debug { top: 60px; background: rgba(0,0,0,0.4); font-size: 12px; max-width: 80vw; white-space: pre-wrap; }
+    #debug { top: 60px; background: rgba(0,0,0,0.4); font-size: 12px; white-space: pre-wrap; }
     #fixBtn {
-      position: absolute;
-      bottom: 20px;
-      left: 50%;
+      position: absolute; bottom: 20px; left: 50%;
       transform: translateX(-50%);
       padding: 12px 24px;
       font-size: 16px;
-      background: #2196f3;
-      color: white;
-      border: none;
-      border-radius: 8px;
-      z-index: 100;
-      cursor: pointer;
+      background: #2196f3; color: white;
+      border: none; border-radius: 8px;
+      z-index: 100; cursor: pointer;
     }
   </style>
 </head>
 <body>
 
 <video id="video" autoplay muted playsinline></video>
-<div id="log">🔍 Загружается...</div>
+<div id="log">Загрузка...</div>
 <div id="debug">⏳</div>
 <button id="fixBtn">📌 Зафиксировать</button>
 
-<!-- Three.js и GLTFLoader -->
+<!-- Three.js -->
 <script src="https://cdn.jsdelivr.net/npm/three@0.145.0/build/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.145.0/examples/js/loaders/GLTFLoader.js"></script>
 
-<!-- ✅ ВСТРАИВАЕМЫЙ DeviceOrientationControls -->
+<!-- Встроенный DeviceOrientationControls -->
 <script>
-/**
- * Встроенная версия DeviceOrientationControls (вырезка из Three.js examples)
- */
-THREE.DeviceOrientationControls = function ( object ) {
+THREE.DeviceOrientationControls = function (object) {
   this.object = object;
-  this.object.rotation.reorder( 'YXZ' );
-
+  this.object.rotation.reorder('YXZ');
   this.enabled = true;
 
-  var scope = this;
+  const scope = this;
+  let deviceOrientation = {};
+  let screenOrientation = 0;
 
-  var deviceOrientation = {};
-  var screenOrientation = 0;
-
-  function onDeviceOrientationChangeEvent( event ) {
+  function onDeviceOrientation(event) {
     deviceOrientation = event;
   }
 
-  function onScreenOrientationChangeEvent() {
+  function onScreenOrientation() {
     screenOrientation = window.orientation || 0;
   }
 
-  function setObjectQuaternion() {
-    var zee = new THREE.Vector3( 0, 0, 1 );
-    var euler = new THREE.Euler();
-    var q0 = new THREE.Quaternion();
-    var q1 = new THREE.Quaternion( - Math.sqrt( 0.5 ), 0, 0, Math.sqrt( 0.5 ) );
+  function setQuaternion(quaternion, alpha, beta, gamma, orient) {
+    const zee = new THREE.Vector3(0, 0, 1);
+    const euler = new THREE.Euler();
+    const q0 = new THREE.Quaternion();
+    const q1 = new THREE.Quaternion(-Math.sqrt(0.5), 0, 0, Math.sqrt(0.5));
 
-    return function ( quaternion, alpha, beta, gamma, orient ) {
-      euler.set( beta, alpha, - gamma, 'YXZ' );
-      quaternion.setFromEuler( euler );
-      quaternion.multiply( q1 );
-      quaternion.multiply( q0.setFromAxisAngle( zee, - orient ) );
-    };
-  }();
+    euler.set(beta, alpha, -gamma, 'YXZ');
+    quaternion.setFromEuler(euler);
+    quaternion.multiply(q1);
+    quaternion.multiply(q0.setFromAxisAngle(zee, -orient));
+  }
 
   this.connect = function () {
-    onScreenOrientationChangeEvent();
-    window.addEventListener( 'orientationchange', onScreenOrientationChangeEvent );
-    window.addEventListener( 'deviceorientation', onDeviceOrientationChangeEvent );
-    scope.enabled = true;
-  };
-
-  this.disconnect = function () {
-    window.removeEventListener( 'orientationchange', onScreenOrientationChangeEvent );
-    window.removeEventListener( 'deviceorientation', onDeviceOrientationChangeEvent );
-    scope.enabled = false;
+    onScreenOrientation();
+    window.addEventListener('orientationchange', onScreenOrientation, false);
+    window.addEventListener('deviceorientation', onDeviceOrientation, false);
+    this.enabled = true;
   };
 
   this.update = function () {
-    if ( scope.enabled === false ) return;
-
-    var alpha = deviceOrientation.alpha ? THREE.MathUtils.degToRad( deviceOrientation.alpha ) : 0;
-    var beta = deviceOrientation.beta ? THREE.MathUtils.degToRad( deviceOrientation.beta ) : 0;
-    var gamma = deviceOrientation.gamma ? THREE.MathUtils.degToRad( deviceOrientation.gamma ) : 0;
-    var orient = screenOrientation ? THREE.MathUtils.degToRad( screenOrientation ) : 0;
-
-    setObjectQuaternion( scope.object.quaternion, alpha, beta, gamma, orient );
+    if (!this.enabled) return;
+    const alpha = deviceOrientation.alpha ? THREE.MathUtils.degToRad(deviceOrientation.alpha) : 0;
+    const beta = deviceOrientation.beta ? THREE.MathUtils.degToRad(deviceOrientation.beta) : 0;
+    const gamma = deviceOrientation.gamma ? THREE.MathUtils.degToRad(deviceOrientation.gamma) : 0;
+    const orient = screenOrientation ? THREE.MathUtils.degToRad(screenOrientation) : 0;
+    setQuaternion(scope.object.quaternion, alpha, beta, gamma, orient);
   };
 };
 </script>
 
 <script>
-let model = null;
-let isFixed = false;
-let fixedPosition = null;
+let model = null, isFixed = false, fixedPos = null;
 
-const log = msg => {
-  document.getElementById("log").textContent = msg;
-  console.log("[LOG]", msg);
-};
-
-const debug = msg => {
-  document.getElementById("debug").textContent = msg;
-  console.log("[DEBUG]", msg);
-};
-
+const log = txt => { document.getElementById("log").textContent = txt; console.log("[LOG]", txt); };
+const debug = txt => { document.getElementById("debug").textContent = txt; };
 const video = document.getElementById("video");
-const fixBtn = document.getElementById("fixBtn");
 
 navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
   .then(stream => {
@@ -145,14 +104,13 @@ navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
   })
   .catch(err => {
     log("❌ Ошибка камеры: " + err.name);
-    console.error(err);
   });
 
 function initScene() {
   log("🧱 Создание сцены...");
 
   const scene = new THREE.Scene();
-  const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.01, 100);
+  const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.01, 100);
   camera.position.set(0, 0, 0);
 
   const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
@@ -194,14 +152,12 @@ function initScene() {
     }
   );
 
-  fixBtn.addEventListener("click", () => {
+  document.getElementById("fixBtn").addEventListener("click", () => {
     if (model) {
       isFixed = true;
-      fixedPosition = model.position.clone();
-      fixBtn.textContent = "✅ Зафиксировано";
-      fixBtn.style.background = "#4caf50";
+      fixedPos = model.position.clone();
       log("📌 Модель зафиксирована");
-      debug(`🔒 Зафиксировано на: x=${fixedPosition.x.toFixed(2)}, y=${fixedPosition.y.toFixed(2)}, z=${fixedPosition.z.toFixed(2)}`);
+      debug(`🧷 x=${fixedPos.x.toFixed(2)} y=${fixedPos.y.toFixed(2)} z=${fixedPos.z.toFixed(2)}`);
     }
   });
 
@@ -215,10 +171,10 @@ function initScene() {
         camera.getWorldDirection(direction);
         const target = direction.multiplyScalar(1.5);
         model.position.lerp(target, 0.15);
-        debug(`🎯 Следим: x=${model.position.x.toFixed(2)}, y=${model.position.y.toFixed(2)}, z=${model.position.z.toFixed(2)}`);
+        debug(`🎯 x=${model.position.x.toFixed(2)} y=${model.position.y.toFixed(2)} z=${model.position.z.toFixed(2)}`);
       } else {
-        model.position.copy(fixedPosition);
-        debug(`🛑 Зафиксировано: x=${fixedPosition.x.toFixed(2)}, y=${fixedPosition.y.toFixed(2)}, z=${fixedPosition.z.toFixed(2)}`);
+        model.position.copy(fixedPos);
+        debug(`🛑 x=${fixedPos.x.toFixed(2)} y=${fixedPos.y.toFixed(2)} z=${fixedPos.z.toFixed(2)}`);
       }
     }
 
