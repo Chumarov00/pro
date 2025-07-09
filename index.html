@@ -2,14 +2,14 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8" />
-  <title>WebAR: Фиксация модели13</title>
+  <title>WebAR: Стабильная фиксация модели</title>
   <style>
     html, body {
       margin: 0;
       overflow: hidden;
       background: black;
     }
-    video {
+    video, canvas {
       position: fixed;
       top: 0;
       left: 0;
@@ -17,11 +17,6 @@
       height: 100vh;
       object-fit: cover;
       z-index: -1;
-    }
-    canvas {
-      position: absolute;
-      top: 0;
-      left: 0;
     }
     #log, #debug {
       position: absolute;
@@ -37,7 +32,7 @@
     }
     #debug {
       top: 60px;
-      background: rgba(0, 0, 0, 0.4);
+      background: rgba(0,0,0,0.4);
       font-size: 12px;
       max-width: 80vw;
       white-space: pre-wrap;
@@ -65,43 +60,41 @@
 <div id="debug">⏳</div>
 <button id="fixBtn">📌 Зафиксировать</button>
 
-<!-- ✅ Стабильные версии Three.js с поддержкой DeviceOrientationControls -->
-<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/DeviceOrientationControls.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.145.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.145.0/examples/js/controls/DeviceOrientationControls.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.145.0/examples/js/loaders/GLTFLoader.js"></script>
 
 <script>
 let model = null;
 let isFixed = false;
+let fixedPosition = null;
 
-const log = document.getElementById("log");
-const debug = document.getElementById("debug");
-const fixBtn = document.getElementById("fixBtn");
-const video = document.getElementById("video");
-
-function logMsg(msg) {
-  log.textContent = msg;
+const log = msg => {
+  document.getElementById("log").textContent = msg;
   console.log("[LOG]", msg);
-}
+};
 
-function debugMsg(msg) {
-  debug.textContent = msg;
+const debug = msg => {
+  document.getElementById("debug").textContent = msg;
   console.log("[DEBUG]", msg);
-}
+};
+
+const video = document.getElementById("video");
+const fixBtn = document.getElementById("fixBtn");
 
 navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
   .then(stream => {
-    logMsg("📷 Камера получена");
     video.srcObject = stream;
+    log("📷 Камера получена");
     initScene();
   })
   .catch(err => {
-    logMsg("❌ Ошибка камеры: " + err.name);
+    log("❌ Ошибка камеры: " + err.name);
     console.error(err);
   });
 
 function initScene() {
-  logMsg("🧱 Создание сцены...");
+  log("🧱 Создание сцены...");
 
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.01, 100);
@@ -118,15 +111,15 @@ function initScene() {
   try {
     controls = new THREE.DeviceOrientationControls(camera);
     controls.connect();
-  } catch (err) {
-    logMsg("❌ Ошибка DeviceOrientationControls");
-    console.error(err);
+  } catch (e) {
+    log("❌ Ошибка DeviceOrientationControls");
+    console.error(e);
     return;
   }
 
   const loader = new THREE.GLTFLoader();
   loader.load(
-    "model.glb", // если у тебя модель лежит по адресу https://chumarov00.github.io/pro/model.glb — можно вставить абсолютный путь
+    "https://chumarov00.github.io/pro/model.glb",
     gltf => {
       model = gltf.scene;
 
@@ -140,28 +133,27 @@ function initScene() {
       model.position.z = -1.5;
 
       scene.add(model);
-      logMsg("✅ Модель загружена");
+      log("✅ Модель загружена");
       animate();
     },
     xhr => {
       const percent = (xhr.loaded / xhr.total) * 100;
-      logMsg(`📦 Загрузка: ${percent.toFixed(1)}%`);
+      log(`📦 Загрузка: ${percent.toFixed(1)}%`);
     },
-    error => {
-      logMsg("❌ Ошибка загрузки модели");
-      console.error(error);
+    err => {
+      log("❌ Ошибка загрузки модели");
+      console.error(err);
     }
   );
 
   fixBtn.addEventListener("click", () => {
-    isFixed = true;
-    fixBtn.textContent = "✅ Зафиксировано";
-    fixBtn.style.background = "#4caf50";
-    logMsg("📌 Модель зафиксирована");
-
     if (model) {
-      const pos = model.position;
-      debugMsg(`🔒 Зафиксировано на: x=${pos.x.toFixed(2)}, y=${pos.y.toFixed(2)}, z=${pos.z.toFixed(2)}`);
+      isFixed = true;
+      fixedPosition = model.position.clone();
+      fixBtn.textContent = "✅ Зафиксировано";
+      fixBtn.style.background = "#4caf50";
+      log("📌 Модель зафиксирована");
+      debug(`🔒 Зафиксировано на: x=${fixedPosition.x.toFixed(2)}, y=${fixedPosition.y.toFixed(2)}, z=${fixedPosition.z.toFixed(2)}`);
     }
   });
 
@@ -173,12 +165,12 @@ function initScene() {
       if (!isFixed) {
         const direction = new THREE.Vector3();
         camera.getWorldDirection(direction);
-        const target = camera.position.clone().add(direction.multiplyScalar(1.5));
-        model.position.lerp(target, 0.1);
-
-        debugMsg(`🎯 Следим: x=${model.position.x.toFixed(2)}, y=${model.position.y.toFixed(2)}, z=${model.position.z.toFixed(2)}`);
+        const target = direction.multiplyScalar(1.5);
+        model.position.lerp(target, 0.15);
+        debug(`🎯 Следим: x=${model.position.x.toFixed(2)}, y=${model.position.y.toFixed(2)}, z=${model.position.z.toFixed(2)}`);
       } else {
-        debugMsg(`🛑 Зафиксировано: x=${model.position.x.toFixed(2)}, y=${model.position.y.toFixed(2)}, z=${model.position.z.toFixed(2)}`);
+        model.position.copy(fixedPosition);
+        debug(`🛑 Зафиксировано: x=${fixedPosition.x.toFixed(2)}, y=${fixedPosition.y.toFixed(2)}, z=${fixedPosition.z.toFixed(2)}`);
       }
     }
 
