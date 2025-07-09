@@ -2,14 +2,13 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8" />
-  <title>WebAR с движением</title>
+  <title>WebAR + ориентация</title>
   <style>
     html, body { margin: 0; overflow: hidden; background: black; }
     video, canvas {
       position: fixed;
       top: 0; left: 0;
-      width: 100vw;
-      height: 100vh;
+      width: 100vw; height: 100vh;
       object-fit: cover;
       z-index: -1;
     }
@@ -23,7 +22,7 @@
       z-index: 10;
     }
     #log { top: 10px; }
-    #debug { top: 50px; white-space: pre; font-size: 12px; }
+    #debug { top: 60px; white-space: pre; font-size: 12px; }
   </style>
 </head>
 <body>
@@ -32,108 +31,122 @@
 <div id="log">🔍 Загрузка...</div>
 <div id="debug">⏳</div>
 
-<!-- Three.js + контроллеры -->
+<!-- Three.js -->
 <script src="https://cdn.jsdelivr.net/npm/three@0.145.0/build/three.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/three@0.145.0/examples/js/controls/DeviceOrientationControls.js"></script>
+<!-- GLTFLoader -->
 <script src="https://cdn.jsdelivr.net/npm/three@0.145.0/examples/js/loaders/GLTFLoader.js"></script>
-
+<!-- DeviceOrientationControls подключаем как модуль -->
 <script>
-const log = document.getElementById("log");
-const debug = document.getElementById("debug");
-const video = document.getElementById("video");
+let DeviceOrientationControls;
 
-let model = null;
-let controls;
-
-function logMsg(msg) {
-  log.textContent = msg;
-  console.log("[LOG]", msg);
-}
-function debugMsg(msg) {
-  debug.textContent = msg;
-  console.log("[DEBUG]", msg);
-}
-
-// 1. Камера
-navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
-  .then(stream => {
-    logMsg("📷 Камера работает");
-    video.srcObject = stream;
-    initScene();
-  })
-  .catch(err => {
-    logMsg("❌ Ошибка камеры: " + err.name);
-    console.error(err);
-  });
-
-function initScene() {
-  logMsg("🧱 Создание сцены...");
-
-  const scene = new THREE.Scene();
-  const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.01, 100);
-  camera.position.set(0, 0, 0);
-
-  const renderer = new THREE.WebGLRenderer({ alpha: true });
-  renderer.setSize(window.innerWidth, window.innerHeight);
-  document.body.appendChild(renderer.domElement);
-
-  // 2. Управление ориентацией
-  controls = new THREE.DeviceOrientationControls(camera);
-
-  // 3. Свет
-  const light = new THREE.AmbientLight(0xffffff, 1.5);
-  scene.add(light);
-
-  // 4. Загрузка модели
-  const loader = new THREE.GLTFLoader();
-  loader.load(
-    'https://chumarov00.github.io/pro/model.glb',
-    gltf => {
-      model = gltf.scene;
-
-      const box = new THREE.Box3().setFromObject(model);
-      const center = box.getCenter(new THREE.Vector3());
-      const size = box.getSize(new THREE.Vector3()).length();
-      const scale = 1 / size * 0.5;
-
-      model.position.sub(center);
-      model.scale.setScalar(scale);
-      model.position.z = -1.5;
-
-      scene.add(model);
-      logMsg("✅ Модель загружена");
-
-      animate();
-    },
-    xhr => {
-      const percent = xhr.lengthComputable ? (xhr.loaded / xhr.total) * 100 : 100;
-      logMsg(`📦 Загрузка: ${percent.toFixed(1)}%`);
-    },
-    error => {
-      logMsg("❌ Ошибка загрузки модели");
-      console.error(error);
-    }
-  );
-
-  function animate() {
-    requestAnimationFrame(animate);
-    controls.update(); // Обновляем ориентацию камеры
-
-    if (model) {
-      const pos = model.position;
-      debugMsg(`📍 Модель: x=${pos.x.toFixed(2)} y=${pos.y.toFixed(2)} z=${pos.z.toFixed(2)}\n🎥 Камера: rotX=${camera.rotation.x.toFixed(2)} rotY=${camera.rotation.y.toFixed(2)}`);
-    }
-
-    renderer.render(scene, camera);
-  }
-
-  window.addEventListener('resize', () => {
-    camera.aspect = window.innerWidth / window.innerHeight;
-    camera.updateProjectionMatrix();
-    renderer.setSize(window.innerWidth, window.innerHeight);
-  });
-}
+(function loadControls() {
+  const script = document.createElement('script');
+  script.src = "https://cdn.jsdelivr.net/npm/three@0.145.0/examples/js/controls/DeviceOrientationControls.js";
+  script.onload = () => {
+    DeviceOrientationControls = window.DeviceOrientationControls || THREE.DeviceOrientationControls;
+    initWebAR();
+  };
+  document.head.appendChild(script);
+})();
 </script>
 
+<script>
+function initWebAR() {
+  const log = document.getElementById("log");
+  const debug = document.getElementById("debug");
+  const video = document.getElementById("video");
+
+  let model = null;
+  let controls;
+
+  function logMsg(msg) {
+    log.textContent = msg;
+    console.log("[LOG]", msg);
+  }
+
+  function debugMsg(msg) {
+    debug.textContent = msg;
+    console.log("[DEBUG]", msg);
+  }
+
+  navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
+    .then(stream => {
+      logMsg("📷 Камера работает");
+      video.srcObject = stream;
+      initScene();
+    })
+    .catch(err => {
+      logMsg("❌ Ошибка камеры: " + err.name);
+      console.error(err);
+    });
+
+  function initScene() {
+    logMsg("🧱 Создание сцены...");
+
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.01, 100);
+    camera.position.set(0, 0, 0);
+
+    const renderer = new THREE.WebGLRenderer({ alpha: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    document.body.appendChild(renderer.domElement);
+
+    // Используем загруженный контроллер
+    controls = new DeviceOrientationControls(camera);
+    controls.connect();
+
+    const light = new THREE.AmbientLight(0xffffff, 1.5);
+    scene.add(light);
+
+    const loader = new THREE.GLTFLoader();
+    loader.load(
+      'https://chumarov00.github.io/pro/model.glb',
+      gltf => {
+        model = gltf.scene;
+
+        const box = new THREE.Box3().setFromObject(model);
+        const center = box.getCenter(new THREE.Vector3());
+        const size = box.getSize(new THREE.Vector3()).length();
+        const scale = 1 / size * 0.5;
+
+        model.position.sub(center);
+        model.scale.setScalar(scale);
+        model.position.z = -1.5;
+
+        scene.add(model);
+        logMsg("✅ Модель загружена");
+
+        animate();
+      },
+      xhr => {
+        const percent = xhr.lengthComputable ? (xhr.loaded / xhr.total) * 100 : 100;
+        logMsg(`📦 Загрузка: ${percent.toFixed(1)}%`);
+      },
+      error => {
+        logMsg("❌ Ошибка загрузки модели");
+        console.error(error);
+      }
+    );
+
+    function animate() {
+      requestAnimationFrame(animate);
+      controls.update();
+
+      if (model) {
+        const pos = model.position;
+        debugMsg(`📍 Модель: x=${pos.x.toFixed(2)} y=${pos.y.toFixed(2)} z=${pos.z.toFixed(2)}\n🎥 Камера rotY=${camera.rotation.y.toFixed(2)}`);
+      }
+
+      renderer.render(scene, camera);
+    }
+
+    window.addEventListener("resize", () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+  }
+}
+</script>
 </body>
 </html>
