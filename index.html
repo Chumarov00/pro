@@ -2,14 +2,14 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8" />
-  <title>WebAR: Фиксация модели12</title>
+  <title>WebAR: Фиксация модели</title>
   <style>
     html, body {
       margin: 0;
       overflow: hidden;
       background: black;
     }
-    video {
+    video, canvas {
       position: fixed;
       top: 0;
       left: 0;
@@ -17,11 +17,6 @@
       height: 100vh;
       object-fit: cover;
       z-index: -1;
-    }
-    canvas {
-      position: absolute;
-      top: 0;
-      left: 0;
     }
     #log, #debug {
       position: absolute;
@@ -37,8 +32,9 @@
     }
     #debug {
       top: 60px;
-      background: rgba(0,0,0,0.4);
+      background: rgba(0, 0, 0, 0.4);
       font-size: 12px;
+      max-width: 80vw;
       white-space: pre-wrap;
     }
     #fixBtn {
@@ -61,12 +57,16 @@
 
 <video id="video" autoplay muted playsinline></video>
 <div id="log">🔍 Загружается...</div>
-<div id="debug">⏳ Ожидание координат...</div>
+<div id="debug">⏳</div>
 <button id="fixBtn">📌 Зафиксировать</button>
 
-<!-- Three.js 0.134.0 и загрузчики -->
+<!-- ✅ Three.js r134 -->
 <script src="https://cdn.jsdelivr.net/npm/three@0.134.0/build/three.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/three@0.134.0/examples/js/controls/DeviceOrientationControls.js"></script>
+
+<!-- ✅ Controls (работающий DeviceOrientationControls) -->
+<script src="https://rawcdn.githack.com/mrdoob/three.js/r134/examples/js/controls/DeviceOrientationControls.js"></script>
+
+<!-- ✅ GLTFLoader -->
 <script src="https://cdn.jsdelivr.net/npm/three@0.134.0/examples/js/loaders/GLTFLoader.js"></script>
 
 <script>
@@ -90,8 +90,8 @@ function debugMsg(msg) {
 
 navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
   .then(stream => {
-    video.srcObject = stream;
     logMsg("📷 Камера получена");
+    video.srcObject = stream;
     initScene();
   })
   .catch(err => {
@@ -113,19 +113,28 @@ function initScene() {
   const light = new THREE.AmbientLight(0xffffff, 1.2);
   scene.add(light);
 
-  const controls = new THREE.DeviceOrientationControls(camera);
-  controls.connect();
+  // ✅ Контроллер ориентации
+  let controls;
+  try {
+    controls = new THREE.DeviceOrientationControls(camera);
+    controls.connect();
+  } catch (e) {
+    logMsg("❌ Ошибка DeviceOrientationControls");
+    console.error(e);
+  }
 
+  // ✅ Загрузка модели
   const loader = new THREE.GLTFLoader();
   loader.load(
     'https://chumarov00.github.io/pro/model.glb',
     gltf => {
       model = gltf.scene;
 
+      // Центровка и масштабирование
       const box = new THREE.Box3().setFromObject(model);
       const center = box.getCenter(new THREE.Vector3());
       const size = box.getSize(new THREE.Vector3()).length();
-      const scale = 1 / size * 0.5;
+      const scale = 1 / size * 0.4;
 
       model.position.sub(center);
       model.scale.setScalar(scale);
@@ -145,6 +154,7 @@ function initScene() {
     }
   );
 
+  // ✅ Фиксация
   fixBtn.addEventListener("click", () => {
     isFixed = true;
     fixBtn.textContent = "✅ Зафиксировано";
@@ -153,20 +163,22 @@ function initScene() {
 
     if (model) {
       const pos = model.position;
-      debugMsg(`🔒 Зафиксировано: x=${pos.x.toFixed(2)}, y=${pos.y.toFixed(2)}, z=${pos.z.toFixed(2)}`);
+      debugMsg(`🔒 Зафиксировано на: x=${pos.x.toFixed(2)}, y=${pos.y.toFixed(2)}, z=${pos.z.toFixed(2)}`);
     }
   });
 
+  // ✅ Анимация
   function animate() {
     requestAnimationFrame(animate);
-    controls.update();
+
+    if (controls) controls.update();
 
     if (model) {
       if (!isFixed) {
         const direction = new THREE.Vector3();
         camera.getWorldDirection(direction);
         const target = camera.position.clone().add(direction.multiplyScalar(1.5));
-        model.position.lerp(target, 0.1);
+        model.position.lerp(target, 0.15);
 
         debugMsg(`🎯 Следим: x=${model.position.x.toFixed(2)}, y=${model.position.y.toFixed(2)}, z=${model.position.z.toFixed(2)}`);
       } else {
@@ -177,6 +189,7 @@ function initScene() {
     renderer.render(scene, camera);
   }
 
+  // Обработка ресайза
   window.addEventListener("resize", () => {
     camera.aspect = window.innerWidth / window.innerHeight;
     camera.updateProjectionMatrix();
@@ -184,6 +197,5 @@ function initScene() {
   });
 }
 </script>
-
 </body>
 </html>
