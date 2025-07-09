@@ -2,14 +2,14 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8" />
-  <title>WebAR: Отладка</title>
+  <title>WebAR Debug</title>
   <style>
     html, body {
       margin: 0;
       overflow: hidden;
       background: black;
     }
-    video {
+    video, canvas {
       position: fixed;
       top: 0;
       left: 0;
@@ -18,76 +18,46 @@
       object-fit: cover;
       z-index: -1;
     }
-    canvas {
-      position: absolute;
-      top: 0;
-      left: 0;
-    }
     #log, #debug {
       position: absolute;
       left: 10px;
       font-family: monospace;
-      padding: 6px 10px;
-      z-index: 99;
+      padding: 5px 10px;
       color: white;
+      background: rgba(0,0,0,0.5);
+      z-index: 10;
     }
-    #log {
-      top: 10px;
-      background: rgba(0,0,0,0.6);
-    }
-    #debug {
-      top: 60px;
-      background: rgba(0, 0, 0, 0.4);
-      font-size: 12px;
-      max-width: 80vw;
-      white-space: pre-wrap;
-    }
-    #fixBtn {
-      position: absolute;
-      bottom: 20px;
-      left: 50%;
-      transform: translateX(-50%);
-      padding: 12px 24px;
-      font-size: 16px;
-      background: #2196f3;
-      color: white;
-      border: none;
-      border-radius: 8px;
-      z-index: 100;
-      cursor: pointer;
-    }
+    #log { top: 10px; }
+    #debug { top: 50px; white-space: pre; font-size: 12px; }
   </style>
 </head>
 <body>
 
 <video id="video" autoplay muted playsinline></video>
-<div id="log">🔍 Загружается...</div>
+<div id="log">🔍 Загрузка...</div>
 <div id="debug">⏳</div>
-<button id="fixBtn">📌 Зафиксировать</button>
 
 <!-- Three.js и GLTFLoader -->
 <script src="https://cdn.jsdelivr.net/npm/three@0.145.0/build/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.145.0/examples/js/loaders/GLTFLoader.js"></script>
 
 <script>
-let model = null;
-let isFixed = false;
-
 const log = document.getElementById("log");
 const debug = document.getElementById("debug");
-const fixBtn = document.getElementById("fixBtn");
 const video = document.getElementById("video");
+
+let model = null;
 
 function logMsg(msg) {
   log.textContent = msg;
   console.log("[LOG]", msg);
 }
-
 function debugMsg(msg) {
   debug.textContent = msg;
   console.log("[DEBUG]", msg);
 }
 
+// Запуск камеры
 navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
   .then(stream => {
     logMsg("📷 Камера работает");
@@ -101,20 +71,21 @@ navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
 
 function initScene() {
   logMsg("🧱 Создание сцены...");
-  const scene = new THREE.Scene();
-  const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 100);
-  camera.position.z = 2;
 
-  const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.01, 100);
+  camera.position.set(0, 0, 0);
+
+  const renderer = new THREE.WebGLRenderer({ alpha: true });
   renderer.setSize(window.innerWidth, window.innerHeight);
   document.body.appendChild(renderer.domElement);
 
-  const light = new THREE.AmbientLight(0xffffff, 1.2);
+  const light = new THREE.AmbientLight(0xffffff, 2);
   scene.add(light);
 
   const loader = new THREE.GLTFLoader();
   loader.load(
-    'model.glb', // укажи свой путь к файлу здесь
+    'https://chumarov00.github.io/pro/model.glb',
     gltf => {
       model = gltf.scene;
 
@@ -132,8 +103,8 @@ function initScene() {
       animate();
     },
     xhr => {
-      const percent = (xhr.loaded / xhr.total) * 100;
-      logMsg(📦 Загрузка: ${percent.toFixed(1)}%);
+      const percent = xhr.lengthComputable ? (xhr.loaded / xhr.total) * 100 : 100;
+      logMsg(`📦 Загрузка: ${percent.toFixed(1)}%`);
     },
     error => {
       logMsg("❌ Ошибка загрузки модели");
@@ -141,39 +112,15 @@ function initScene() {
     }
   );
 
-  fixBtn.addEventListener("click", () => {
-    isFixed = true;
-    fixBtn.textContent = "✅ Зафиксировано";
-    fixBtn.style.background = "#4caf50";
-    logMsg("📌 Модель зафиксирована");
-
-    if (model) {
-      const pos = model.position;
-      debugMsg(🔒 Зафиксировано на: x=${pos.x.toFixed(2)}, y=${pos.y.toFixed(2)}, z=${pos.z.toFixed(2)});
-    } else {
-      debugMsg("⚠️ Модель ещё не загружена");
-    }
-  });
-
   function animate() {
     requestAnimationFrame(animate);
-
     if (model) {
-      if (!isFixed) {
-        const direction = new THREE.Vector3();
-        camera.getWorldDirection(direction);
-        const targetPosition = camera.position.clone().add(direction.multiplyScalar(1.5));
-        model.position.lerp(targetPosition, 0.15);
-        debugMsg(🎯 Следим: x=${model.position.x.toFixed(2)}, y=${model.position.y.toFixed(2)}, z=${model.position.z.toFixed(2)});
-      } else {
-        debugMsg(🛑 Зафиксировано: x=${model.position.x.toFixed(2)}, y=${model.position.y.toFixed(2)}, z=${model.position.z.toFixed(2)});
-      }
+      debugMsg(`📍 Позиция: x=${model.position.x.toFixed(2)} y=${model.position.y.toFixed(2)} z=${model.position.z.toFixed(2)}`);
     }
-
     renderer.render(scene, camera);
   }
 
-  window.addEventListener("resize", () => {
+  window.addEventListener('resize', () => {
     camera.aspect = window.innerWidth / window.innerHeight;
     camera.updateProjectionMatrix();
     renderer.setSize(window.innerWidth, window.innerHeight);
