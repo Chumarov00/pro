@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8" />
-  <title>WebAR: Стабильная фиксация модели</title>
+  <title>WebAR: Фиксация модели</title>
   <style>
     html, body {
       margin: 0;
@@ -26,17 +26,8 @@
       z-index: 99;
       color: white;
     }
-    #log {
-      top: 10px;
-      background: rgba(0,0,0,0.6);
-    }
-    #debug {
-      top: 60px;
-      background: rgba(0,0,0,0.4);
-      font-size: 12px;
-      max-width: 80vw;
-      white-space: pre-wrap;
-    }
+    #log { top: 10px; background: rgba(0,0,0,0.6); }
+    #debug { top: 60px; background: rgba(0,0,0,0.4); font-size: 12px; max-width: 80vw; white-space: pre-wrap; }
     #fixBtn {
       position: absolute;
       bottom: 20px;
@@ -60,9 +51,73 @@
 <div id="debug">⏳</div>
 <button id="fixBtn">📌 Зафиксировать</button>
 
+<!-- Three.js и GLTFLoader -->
 <script src="https://cdn.jsdelivr.net/npm/three@0.145.0/build/three.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/three@0.145.0/examples/js/controls/DeviceOrientationControls.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.145.0/examples/js/loaders/GLTFLoader.js"></script>
+
+<!-- ✅ ВСТРАИВАЕМЫЙ DeviceOrientationControls -->
+<script>
+/**
+ * Встроенная версия DeviceOrientationControls (вырезка из Three.js examples)
+ */
+THREE.DeviceOrientationControls = function ( object ) {
+  this.object = object;
+  this.object.rotation.reorder( 'YXZ' );
+
+  this.enabled = true;
+
+  var scope = this;
+
+  var deviceOrientation = {};
+  var screenOrientation = 0;
+
+  function onDeviceOrientationChangeEvent( event ) {
+    deviceOrientation = event;
+  }
+
+  function onScreenOrientationChangeEvent() {
+    screenOrientation = window.orientation || 0;
+  }
+
+  function setObjectQuaternion() {
+    var zee = new THREE.Vector3( 0, 0, 1 );
+    var euler = new THREE.Euler();
+    var q0 = new THREE.Quaternion();
+    var q1 = new THREE.Quaternion( - Math.sqrt( 0.5 ), 0, 0, Math.sqrt( 0.5 ) );
+
+    return function ( quaternion, alpha, beta, gamma, orient ) {
+      euler.set( beta, alpha, - gamma, 'YXZ' );
+      quaternion.setFromEuler( euler );
+      quaternion.multiply( q1 );
+      quaternion.multiply( q0.setFromAxisAngle( zee, - orient ) );
+    };
+  }();
+
+  this.connect = function () {
+    onScreenOrientationChangeEvent();
+    window.addEventListener( 'orientationchange', onScreenOrientationChangeEvent );
+    window.addEventListener( 'deviceorientation', onDeviceOrientationChangeEvent );
+    scope.enabled = true;
+  };
+
+  this.disconnect = function () {
+    window.removeEventListener( 'orientationchange', onScreenOrientationChangeEvent );
+    window.removeEventListener( 'deviceorientation', onDeviceOrientationChangeEvent );
+    scope.enabled = false;
+  };
+
+  this.update = function () {
+    if ( scope.enabled === false ) return;
+
+    var alpha = deviceOrientation.alpha ? THREE.MathUtils.degToRad( deviceOrientation.alpha ) : 0;
+    var beta = deviceOrientation.beta ? THREE.MathUtils.degToRad( deviceOrientation.beta ) : 0;
+    var gamma = deviceOrientation.gamma ? THREE.MathUtils.degToRad( deviceOrientation.gamma ) : 0;
+    var orient = screenOrientation ? THREE.MathUtils.degToRad( screenOrientation ) : 0;
+
+    setObjectQuaternion( scope.object.quaternion, alpha, beta, gamma, orient );
+  };
+};
+</script>
 
 <script>
 let model = null;
@@ -107,15 +162,8 @@ function initScene() {
   const light = new THREE.AmbientLight(0xffffff, 1.2);
   scene.add(light);
 
-  let controls;
-  try {
-    controls = new THREE.DeviceOrientationControls(camera);
-    controls.connect();
-  } catch (e) {
-    log("❌ Ошибка DeviceOrientationControls");
-    console.error(e);
-    return;
-  }
+  const controls = new THREE.DeviceOrientationControls(camera);
+  controls.connect();
 
   const loader = new THREE.GLTFLoader();
   loader.load(
