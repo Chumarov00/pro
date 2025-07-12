@@ -1,117 +1,113 @@
 <!DOCTYPE html>
 <html lang="ru">
-  <head>
-    <meta charset="UTF-8" />
-    <title>MindAR + фиксация модели12</title>
+<head>
+  <meta charset="UTF-8">
+  <title>MindAR: фиксация модели</title>
+  <script src="https://cdn.jsdelivr.net/npm/aframe@1.4.2/dist/aframe.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
+  <style>
+    html, body { margin: 0; padding: 0; overflow: hidden; background: black; }
+    a-scene { position: absolute; width: 100vw; height: 100vh; top: 0; left: 0; }
+    #fix-button {
+      position: absolute;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      padding: 12px 24px;
+      font-size: 16px;
+      background: #2196f3;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      z-index: 99;
+    }
+    #debug {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      background: rgba(0,0,0,0.6);
+      color: white;
+      font-family: monospace;
+      padding: 6px 12px;
+      z-index: 99;
+    }
+  </style>
+</head>
+<body>
+  <button id="fix-button">📌 Зафиксировать</button>
+  <div id="debug">⏳ Инициализация...</div>
 
-    <!-- A-Frame и MindAR -->
-    <script src="https://cdn.jsdelivr.net/npm/aframe@1.4.2/dist/aframe.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
+  <a-scene
+    mindar-image="imageTargetSrc: https://cdn.jsdelivr.net/gh/hiukim/mind-ar-js@1.2.5/examples/image-tracking/assets/card-example/card.mind"
+    device-orientation-permission-ui="enabled: true"
+    vr-mode-ui="enabled: false"
+    embedded
+    renderer="colorManagement: true; logarithmicDepthBuffer: true;"
+  >
+    <a-assets>
+      <a-asset-item id="model" src="https://cdn.jsdelivr.net/gh/hiukim/mind-ar-js@1.2.5/examples/image-tracking/assets/toy-block/toy-block.glb"></a-asset-item>
+    </a-assets>
 
-    <style>
-      html, body {
-        margin: 0;
-        padding: 0;
-        width: 100%;
-        height: 100%;
-        overflow: hidden;
-        background: black;
-      }
+    <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
 
-      a-scene {
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100vw;
-        height: 100vh;
-      }
+    <a-entity mindar-image-target="targetIndex: 0">
+      <a-entity id="model-root"
+        gltf-model="#model"
+        position="0 0 0"
+        scale="0.5 0.5 0.5"
+        visible="false"
+      ></a-entity>
+    </a-entity>
+  </a-scene>
 
-      #fix-button {
-        position: absolute;
-        bottom: 20px;
-        left: 50%;
-        transform: translateX(-50%);
-        padding: 12px 24px;
-        font-size: 16px;
-        background: #2196f3;
-        color: white;
-        border: none;
-        border-radius: 8px;
-        z-index: 100;
-        cursor: pointer;
-      }
-    </style>
-  </head>
-  <body>
-    <button id="fix-button">📌 Зафиксировать</button>
+  <script>
+    const debug = document.getElementById("debug");
+    const fixBtn = document.getElementById("fix-button");
 
-    <a-scene
-      mindar-image="imageTargetSrc: https://cdn.jsdelivr.net/gh/hiukim/mind-ar-js@1.2.5/examples/image-tracking/assets/card-example/card.mind"
-      vr-mode-ui="enabled: false"
-      device-orientation-permission-ui="enabled: true"
-      embedded
-      renderer="colorManagement: true; logarithmicDepthBuffer: true;"
-    >
-      <a-assets>
-        <!-- Можешь заменить cube.glb на свою модель -->
-        <a-asset-item id="model" src="https://cdn.jsdelivr.net/gh/hiukim/mind-ar-js@1.2.5/examples/image-tracking/assets/toy-block/toy-block.glb"></a-asset-item>
-      </a-assets>
+    let isFixed = false;
+    let fixedPosition = null;
+    let fixedRotation = null;
 
-      <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
+    document.querySelector("a-scene").addEventListener("loaded", () => {
+      const sceneEl = document.querySelector("a-scene");
+      const model = document.querySelector("#model-root");
 
-      <a-entity mindar-image-target="targetIndex: 0">
-        <a-entity
-          id="model-root"
-          gltf-model="#model"
-          position="0 0 0"
-          scale="0.5 0.5 0.5"
-          visible="false"
-        ></a-entity>
-      </a-entity>
-    </a-scene>
+      debug.textContent = "✅ Сцена загружена";
 
-    <script>
-      const sceneEl = document.querySelector('a-scene');
-      const model = document.querySelector('#model-root');
-      const fixBtn = document.querySelector('#fix-button');
-
-      let isFixed = false;
-      let fixedPosition = null;
-      let fixedRotation = null;
-
-      // Показываем модель при детекции маркера
-      sceneEl.addEventListener('targetFound', () => {
+      sceneEl.addEventListener("targetFound", () => {
         if (!isFixed) {
-          model.setAttribute('visible', 'true');
+          model.setAttribute("visible", "true");
+          debug.textContent = "🎯 Маркер найден";
         }
       });
 
-      // Скрываем, если маркер потерян
-      sceneEl.addEventListener('targetLost', () => {
+      sceneEl.addEventListener("targetLost", () => {
         if (!isFixed) {
-          model.setAttribute('visible', 'false');
+          model.setAttribute("visible", "false");
+          debug.textContent = "❌ Маркер потерян";
         }
       });
 
-      fixBtn.addEventListener('click', () => {
+      fixBtn.addEventListener("click", () => {
         if (!isFixed) {
+          const parent = model.parentElement;
           fixedPosition = model.object3D.position.clone();
           fixedRotation = model.object3D.rotation.clone();
-          isFixed = true;
 
-          // Отключаем родителя-маркера (чтобы модель не пропадала)
-          const parent = model.parentElement;
           parent.removeChild(model);
           sceneEl.appendChild(model);
 
           model.object3D.position.copy(fixedPosition);
           model.object3D.rotation.copy(fixedRotation);
-          model.setAttribute('visible', 'true');
+          model.setAttribute("visible", "true");
 
-          fixBtn.innerText = '✅ Зафиксировано';
-          fixBtn.style.background = '#4caf50';
+          fixBtn.textContent = "✅ Зафиксировано";
+          fixBtn.style.background = "#4caf50";
+          debug.textContent = `📌 Зафиксировано на x=${fixedPosition.x.toFixed(2)}, y=${fixedPosition.y.toFixed(2)}`;
+          isFixed = true;
         }
       });
-    </script>
-  </body>
+    });
+  </script>
+</body>
 </html>
