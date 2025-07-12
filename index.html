@@ -1,32 +1,71 @@
 <!DOCTYPE html>
 <html>
   <head>
-    <meta charset="utf-8">
-    <title>MindAR Test</title>
-    <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
+    <meta charset="UTF-8" />
+    <title>MindAR + Фиксация модели</title>
+    <script src="https://cdn.jsdelivr.net/npm/aframe@1.4.2/dist/aframe.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
     <style>
-      body { margin: 0; overflow: hidden; }
-      #ar-container { width: 100vw; height: 100vh; position: fixed; top: 0; left: 0; }
+      body {
+        margin: 0;
+        overflow: hidden;
+      }
+      #fix-button {
+        position: absolute;
+        bottom: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        padding: 12px 24px;
+        font-size: 16px;
+        background: #2196f3;
+        color: white;
+        border: none;
+        border-radius: 8px;
+        z-index: 100;
+        cursor: pointer;
+      }
     </style>
   </head>
   <body>
-    <div id="ar-container">
-      <a-scene mindar-image="imageTargetSrc: https://cdn.jsdelivr.net/gh/hiukim/mind-ar-js@1.2.5/examples/image-tracking/assets/card-example/card.mind;" 
-               vr-mode-ui="enabled: false" 
-               device-orientation-permission-ui="enabled: true"
-               embedded
-               renderer="colorManagement: true, physicallyCorrectLights">
-        <a-assets>
-          <a-asset-item id="model" src="https://chumarov00.github.io/pro/model.glb"></a-asset-item>
-        </a-assets>
+    <button id="fix-button">📌 Зафиксировать</button>
 
-        <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
+    <a-scene mindar-image="imageTargetSrc: https://cdn.jsdelivr.net/gh/hiukim/mind-ar-js@1.2.5/examples/image-tracking/assets/card-example/card.mind;" 
+             vr-mode-ui="enabled: false" 
+             device-orientation-permission-ui="enabled: true"
+             embedded
+             renderer="colorManagement: true; antialias: true;" 
+             loading-screen="enabled: false">
 
-        <a-entity mindar-image-target="targetIndex: 0">
-          <a-gltf-model src="#model" position="0 0 0" rotation="0 0 0" scale="0.2 0.2 0.2"></a-gltf-model>
-        </a-entity>
-      </a-scene>
-    </div>
+      <a-assets>
+        <a-asset-item id="model" src="https://chumarov00.github.io/pro/model.glb"></a-asset-item>
+      </a-assets>
+
+      <a-camera position="0 0 0" look-controls="enabled: true"></a-camera>
+
+      <a-entity id="target" mindar-image-target="targetIndex: 0">
+        <a-gltf-model id="fixable-model" src="#model" scale="0.2 0.2 0.2" position="0 0 0" visible="true"></a-gltf-model>
+      </a-entity>
+    </a-scene>
+
+    <script>
+      let isFixed = false;
+      const model = document.querySelector("#fixable-model");
+      const marker = document.querySelector("#target");
+      const fixBtn = document.getElementById("fix-button");
+
+      fixBtn.addEventListener("click", () => {
+        if (!isFixed) {
+          // Зафиксировать позицию
+          const worldPos = new THREE.Vector3();
+          model.object3D.getWorldPosition(worldPos);
+          model.setAttribute("position", worldPos);
+          marker.removeChild(model); // открепляем от маркера
+          document.querySelector("a-scene").appendChild(model); // переносим в сцену
+          isFixed = true;
+          fixBtn.innerText = "✅ Зафиксировано";
+          fixBtn.style.backgroundColor = "#4caf50";
+        }
+      });
+    </script>
   </body>
 </html>
