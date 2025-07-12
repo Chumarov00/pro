@@ -1,15 +1,31 @@
 <!DOCTYPE html>
-<html>
+<html lang="ru">
   <head>
     <meta charset="UTF-8" />
-    <title>MindAR + Фиксация модели</title>
+    <title>MindAR + фиксация модели</title>
+
+    <!-- A-Frame и MindAR -->
     <script src="https://cdn.jsdelivr.net/npm/aframe@1.4.2/dist/aframe.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
+
     <style>
-      body {
+      html, body {
         margin: 0;
+        padding: 0;
+        width: 100%;
+        height: 100%;
         overflow: hidden;
+        background: black;
       }
+
+      a-scene {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+      }
+
       #fix-button {
         position: absolute;
         bottom: 20px;
@@ -29,41 +45,71 @@
   <body>
     <button id="fix-button">📌 Зафиксировать</button>
 
-    <a-scene mindar-image="imageTargetSrc: https://cdn.jsdelivr.net/gh/hiukim/mind-ar-js@1.2.5/examples/image-tracking/assets/card-example/card.mind;" 
-             vr-mode-ui="enabled: false" 
-             device-orientation-permission-ui="enabled: true"
-             embedded
-             renderer="colorManagement: true; antialias: true;" 
-             loading-screen="enabled: false">
-
+    <a-scene
+      mindar-image="imageTargetSrc: https://cdn.jsdelivr.net/gh/hiukim/mind-ar-js@1.2.5/examples/image-tracking/assets/card-example/card.mind"
+      vr-mode-ui="enabled: false"
+      device-orientation-permission-ui="enabled: true"
+      embedded
+      renderer="colorManagement: true; logarithmicDepthBuffer: true;"
+    >
       <a-assets>
-        <a-asset-item id="model" src="https://chumarov00.github.io/pro/model.glb"></a-asset-item>
+        <!-- Можешь заменить cube.glb на свою модель -->
+        <a-asset-item id="model" src="https://cdn.jsdelivr.net/gh/hiukim/mind-ar-js@1.2.5/examples/image-tracking/assets/toy-block/toy-block.glb"></a-asset-item>
       </a-assets>
 
-      <a-camera position="0 0 0" look-controls="enabled: true"></a-camera>
+      <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
 
-      <a-entity id="target" mindar-image-target="targetIndex: 0">
-        <a-gltf-model id="fixable-model" src="#model" scale="0.2 0.2 0.2" position="0 0 0" visible="true"></a-gltf-model>
+      <a-entity mindar-image-target="targetIndex: 0">
+        <a-entity
+          id="model-root"
+          gltf-model="#model"
+          position="0 0 0"
+          scale="0.5 0.5 0.5"
+          visible="false"
+        ></a-entity>
       </a-entity>
     </a-scene>
 
     <script>
-      let isFixed = false;
-      const model = document.querySelector("#fixable-model");
-      const marker = document.querySelector("#target");
-      const fixBtn = document.getElementById("fix-button");
+      const sceneEl = document.querySelector('a-scene');
+      const model = document.querySelector('#model-root');
+      const fixBtn = document.querySelector('#fix-button');
 
-      fixBtn.addEventListener("click", () => {
+      let isFixed = false;
+      let fixedPosition = null;
+      let fixedRotation = null;
+
+      // Показываем модель при детекции маркера
+      sceneEl.addEventListener('targetFound', () => {
         if (!isFixed) {
-          // Зафиксировать позицию
-          const worldPos = new THREE.Vector3();
-          model.object3D.getWorldPosition(worldPos);
-          model.setAttribute("position", worldPos);
-          marker.removeChild(model); // открепляем от маркера
-          document.querySelector("a-scene").appendChild(model); // переносим в сцену
+          model.setAttribute('visible', 'true');
+        }
+      });
+
+      // Скрываем, если маркер потерян
+      sceneEl.addEventListener('targetLost', () => {
+        if (!isFixed) {
+          model.setAttribute('visible', 'false');
+        }
+      });
+
+      fixBtn.addEventListener('click', () => {
+        if (!isFixed) {
+          fixedPosition = model.object3D.position.clone();
+          fixedRotation = model.object3D.rotation.clone();
           isFixed = true;
-          fixBtn.innerText = "✅ Зафиксировано";
-          fixBtn.style.backgroundColor = "#4caf50";
+
+          // Отключаем родителя-маркера (чтобы модель не пропадала)
+          const parent = model.parentElement;
+          parent.removeChild(model);
+          sceneEl.appendChild(model);
+
+          model.object3D.position.copy(fixedPosition);
+          model.object3D.rotation.copy(fixedRotation);
+          model.setAttribute('visible', 'true');
+
+          fixBtn.innerText = '✅ Зафиксировано';
+          fixBtn.style.background = '#4caf50';
         }
       });
     </script>
