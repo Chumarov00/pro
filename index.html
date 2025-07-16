@@ -1,36 +1,50 @@
 <!DOCTYPE html>
 <html>
-<head>
-  <meta charset="UTF-8">
-  <title>Test Camera Access</title>
-  <style>
-    body, html {
-      margin: 0;
-      padding: 0;
-      overflow: hidden;
-      background: #000;
-    }
-    video {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-    }
-  </style>
-</head>
-<body>
-  <video id="camera" autoplay playsinline></video>
+  <head>
+    <meta charset="UTF-8" />
+    <title>MindAR Marker Test</title>
 
-  <script>
-    const video = document.getElementById("camera");
+    <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.1.4/dist/mindar-image-three.prod.js"></script>
 
-    navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
-      .then((stream) => {
-        video.srcObject = stream;
-      })
-      .catch((err) => {
-        console.error("Ошибка доступа к камере:", err);
-        alert("Не удалось получить доступ к камере: " + err.message);
+    <style>
+      html, body {
+        margin: 0;
+        overflow: hidden;
+        height: 100%;
+      }
+      #ar-container {
+        width: 100vw;
+        height: 100vh;
+        background: #000;
+      }
+    </style>
+  </head>
+
+  <body>
+    <div id="ar-container"></div>
+
+    <script>
+      document.addEventListener("DOMContentLoaded", async () => {
+        const mindarThree = new window.MINDAR.IMAGE.MindARThree({
+          container: document.querySelector("#ar-container"),
+          imageTargetSrc: "./targets.mind", // ← твой файл
+        });
+
+        const { renderer, scene, camera } = mindarThree;
+        const anchor = mindarThree.addAnchor(0);
+
+        const box = new mindarThree.THREE.Mesh(
+          new mindarThree.THREE.BoxGeometry(0.5, 0.5, 0.5),
+          new mindarThree.THREE.MeshBasicMaterial({ color: 0x00ff00 })
+        );
+        box.position.set(0, 0, 0);
+        anchor.group.add(box);
+
+        await mindarThree.start();
+        renderer.setAnimationLoop(() => {
+          renderer.render(scene, camera);
+        });
       });
-  </script>
-</body>
+    </script>
+  </body>
 </html>
