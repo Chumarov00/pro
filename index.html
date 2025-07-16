@@ -1,28 +1,36 @@
 <!DOCTYPE html>
 <html>
-  <head>
-    <meta charset="utf-8" />
-    <title>WebAR: Marker + model.glb12</title>
+<head>
+  <meta charset="UTF-8">
+  <title>Test Camera Access</title>
+  <style>
+    body, html {
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      background: #000;
+    }
+    video {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+  </style>
+</head>
+<body>
+  <video id="camera" autoplay playsinline></video>
 
-    <!-- Только MindAR, включает свою Three.js -->
-    <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.1.4/dist/mindar-image-three.prod.js"></script>
+  <script>
+    const video = document.getElementById("camera");
 
-    <style>
-      html, body {
-        margin: 0;
-        overflow: hidden;
-        height: 100%;
-      }
-      #ar-container {
-        width: 100%;
-        height: 100%;
-        background: #000;
-      }
-    </style>
-  </head>
-
-  <body>
-    <div id="ar-container"></div>
-    <script src="script.js"></script>
-  </body>
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
+      .then((stream) => {
+        video.srcObject = stream;
+      })
+      .catch((err) => {
+        console.error("Ошибка доступа к камере:", err);
+        alert("Не удалось получить доступ к камере: " + err.message);
+      });
+  </script>
+</body>
 </html>
