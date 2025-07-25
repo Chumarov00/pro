@@ -2,9 +2,7 @@
 <html>
   <head>
     <meta charset="UTF-8" />
-    <title>WebAR с фиксацией</title>
-
-    <!-- A-Frame + MindAR -->
+    <title>MindAR с фиксацией12</title>
     <script src="https://cdn.jsdelivr.net/npm/aframe@1.5.0/dist/aframe.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.1.7/dist/mindar-image-aframe.prod.js"></script>
     <style>
@@ -16,7 +14,7 @@
         transform: translateX(-50%);
         padding: 10px 20px;
         font-size: 16px;
-        z-index: 10;
+        z-index: 999;
       }
     </style>
   </head>
@@ -24,55 +22,47 @@
   <body>
     <button id="fixButton">🔒 Зафиксировать модель</button>
 
-    <a-scene mindar-image="imageTargetSrc: ./targets.mind;" 
-             color-space="sRGB" 
-             embedded 
-             renderer="colorManagement: true, physicallyCorrectLights"
-             vr-mode-ui="enabled: false"
-             device-orientation-permission-ui="enabled: true">
-             
-      <!-- Камера с AR -->
-      <a-camera position="0 0 0" look-controls enabled="false" 
-                mindar-camera></a-camera>
+    <a-scene
+      mindar-image="imageTargetSrc: targets.mind"
+      embedded
+      color-space="sRGB"
+      renderer="colorManagement: true, physicallyCorrectLights"
+      vr-mode-ui="enabled: false"
+      device-orientation-permission-ui="enabled: true"
+    >
+      <a-assets>
+        <a-asset-item id="modelGLB" src="model.glb"></a-asset-item>
+      </a-assets>
 
-      <!-- Слой для маркера -->
+      <a-camera position="0 0 0" look-controls="enabled: false" mindar-camera></a-camera>
+
+      <!-- Маркер -->
       <a-entity mindar-image-target="targetIndex: 0">
-        <a-entity id="model" 
-                  gltf-model="./model.glb" 
-                  scale="0.3 0.3 0.3" 
-                  position="0 0 0" 
-                  rotation="0 0 0">
-        </a-entity>
+        <a-entity id="model" gltf-model="#modelGLB" scale="0.3 0.3 0.3" position="0 0 0"></a-entity>
       </a-entity>
 
-      <!-- Контейнер для зафиксированной модели -->
+      <!-- Место для фиксированной копии -->
       <a-entity id="fixedModel" visible="false"></a-entity>
     </a-scene>
 
     <script>
       const fixButton = document.getElementById('fixButton');
-      const originalModel = document.querySelector('#model');
+      const model = document.querySelector('#model');
       const fixedModel = document.querySelector('#fixedModel');
 
       fixButton.addEventListener('click', () => {
-        // Получаем позицию и вращение текущей модели
-        const position = originalModel.object3D.getWorldPosition(new THREE.Vector3());
-        const rotation = originalModel.object3D.getWorldRotation(new THREE.Euler());
+        const pos = model.object3D.getWorldPosition(new THREE.Vector3());
+        const rot = model.object3D.getWorldRotation(new THREE.Euler());
 
-        // Клонируем модель и размещаем фиксированную копию
-        const newEntity = document.createElement('a-entity');
-        newEntity.setAttribute('gltf-model', './model.glb');
-        newEntity.setAttribute('scale', '0.3 0.3 0.3');
-        newEntity.setAttribute('position', `${position.x} ${position.y} ${position.z}`);
-        newEntity.setAttribute('rotation', `${THREE.Math.radToDeg(rotation.x)} ${THREE.Math.radToDeg(rotation.y)} ${THREE.Math.radToDeg(rotation.z)}`);
+        const clone = document.createElement('a-entity');
+        clone.setAttribute('gltf-model', '#modelGLB');
+        clone.setAttribute('scale', '0.3 0.3 0.3');
+        clone.setAttribute('position', `${pos.x} ${pos.y} ${pos.z}`);
+        clone.setAttribute('rotation', `${THREE.Math.radToDeg(rot.x)} ${THREE.Math.radToDeg(rot.y)} ${THREE.Math.radToDeg(rot.z)}`);
 
-        fixedModel.appendChild(newEntity);
+        fixedModel.appendChild(clone);
         fixedModel.setAttribute('visible', 'true');
-
-        // Скрываем оригинал (привязанный к маркеру)
-        originalModel.setAttribute('visible', 'false');
-
-        // Скрываем кнопку
+        model.setAttribute('visible', 'false');
         fixButton.style.display = 'none';
       });
     </script>
