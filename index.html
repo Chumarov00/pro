@@ -75,4 +75,20 @@
         fixedModel.setAttribute('position', `${worldPos.x} ${worldPos.y} ${worldPos.z}`);
         const euler = new THREE.Euler().setFromQuaternion(worldQuat, 'YXZ');
         fixedModel.setAttribute('rotation', `${THREE.MathUtils.radToDeg(euler.x)} ${THREE.MathUtils.radToDeg(euler.y)} ${THREE.MathUtils.radToDeg(euler.z)}`);
-        fixedModel.setAttribute('scale', `${worldScale.x} ${worldScale.y} ${worldScale.
+        fixedModel.setAttribute('scale', `${worldScale.x} ${worldScale.y} ${worldScale.z}`);
+
+        const gltf = document.createElement('a-gltf-model');
+        gltf.setAttribute('src', '#model');
+        fixedModel.appendChild(gltf);
+
+        scene.appendChild(fixedModel);
+
+        // Отключаем маркер
+        marker.setAttribute('visible', 'false');
+
+        // Скрываем кнопку
+        fixButton.style.display = 'none';
+      });
+    </script>
+  </body>
+</html>
