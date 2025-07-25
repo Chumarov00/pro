@@ -2,9 +2,11 @@
 <html>
   <head>
     <meta charset="utf-8">
-    <title>MindAR Fixation</title>
+    <title>MindAR Fixation Final</title>
     <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.150.1/build/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.150.1/examples/js/loaders/GLTFLoader.js"></script>
     <style>
       body { margin: 0; overflow: hidden; }
       #ar-container { width: 100vw; height: 100vh; position: fixed; top: 0; left: 0; }
@@ -16,11 +18,10 @@
         z-index: 10;
         padding: 12px 24px;
         font-size: 18px;
-        background-color: rgba(255, 255, 255, 0.8);
+        background-color: rgba(255, 255, 255, 0.9);
         border: 2px solid #333;
         border-radius: 10px;
         cursor: pointer;
-        user-select: none;
       }
       #fix-button:active {
         background-color: #ccc;
@@ -37,62 +38,51 @@
         embedded
         renderer="colorManagement: true, physicallyCorrectLights: true">
         
-        <a-assets>
-          <a-asset-item id="model" src="https://chumarov00.github.io/pro/model.glb"></a-asset-item>
-        </a-assets>
+        <a-assets></a-assets>
 
         <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
 
-        <!-- Место для зафиксированной модели -->
-        <a-entity id="fixed-model-container"></a-entity>
-
-        <!-- Контейнер модели, пока она привязана к маркеру -->
-        <a-entity id="marker-target" mindar-image-target="targetIndex: 0">
-          <a-gltf-model 
-            id="tracking-model"
-            src="#model" 
-            position="0 0 0" 
-            rotation="0 0 0" 
-            scale="0.2 0.2 0.2">
-          </a-gltf-model>
+        <a-entity id="marker" mindar-image-target="targetIndex: 0">
+          <a-entity id="model-anchor"></a-entity>
         </a-entity>
       </a-scene>
     </div>
 
     <script>
       document.addEventListener("DOMContentLoaded", () => {
-        const fixButton = document.getElementById("fix-button");
-        const marker = document.getElementById("marker-target");
-        const trackingModel = document.getElementById("tracking-model");
-        const fixedContainer = document.getElementById("fixed-model-container");
+        const scene = document.querySelector("a-scene").object3D;
+        const marker = document.getElementById("marker");
+        const modelAnchor = document.getElementById("model-anchor").object3D;
+        const button = document.getElementById("fix-button");
 
+        const loader = new THREE.GLTFLoader();
+        let gltfModel = null;
         let fixed = false;
 
-        fixButton.addEventListener("click", () => {
-          if (fixed) return;
+        loader.load("https://chumarov00.github.io/pro/model.glb", (gltf) => {
+          gltfModel = gltf.scene;
+          gltfModel.scale.set(0.2, 0.2, 0.2);
+          modelAnchor.add(gltfModel.clone()); // Показываем на маркере
+        });
+
+        button.addEventListener("click", () => {
+          if (fixed || !gltfModel) return;
           fixed = true;
 
-          // Получаем мировые координаты
+          // Получаем мировые координаты якоря
           const worldPos = new THREE.Vector3();
           const worldQuat = new THREE.Quaternion();
-          trackingModel.object3D.getWorldPosition(worldPos);
-          trackingModel.object3D.getWorldQuaternion(worldQuat);
+          modelAnchor.getWorldPosition(worldPos);
+          modelAnchor.getWorldQuaternion(worldQuat);
 
-          // Создаём новую модель
-          const fixedModel = document.createElement("a-gltf-model");
-          fixedModel.setAttribute("src", "#model");
-          fixedModel.setAttribute("scale", "0.2 0.2 0.2");
+          // Клонируем модель и добавляем в сцену
+          const fixedModel = gltfModel.clone(true);
+          fixedModel.position.copy(worldPos);
+          fixedModel.quaternion.copy(worldQuat);
+          fixedModel.scale.set(0.2, 0.2, 0.2);
+          scene.add(fixedModel);
 
-          // Ждём, пока модель загрузится, и только потом ставим позицию
-          fixedModel.addEventListener("model-loaded", () => {
-            fixedModel.object3D.position.copy(worldPos);
-            fixedModel.object3D.quaternion.copy(worldQuat);
-          });
-
-          // Добавляем в сцену
-          fixedContainer.appendChild(fixedModel);
-
-          // Скрываем маркер
+          // Отключаем маркер
           marker.setAttribute("visible", "false");
         });
       });
