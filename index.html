@@ -62,7 +62,6 @@
     <script>
       document.addEventListener("DOMContentLoaded", () => {
         const fixButton = document.getElementById("fix-button");
-        const scene = document.querySelector("a-scene");
         const marker = document.getElementById("marker-target");
         const trackingModel = document.getElementById("tracking-model");
         const fixedContainer = document.getElementById("fixed-model-container");
@@ -73,25 +72,27 @@
           if (fixed) return;
           fixed = true;
 
-          // Получаем позицию и поворот из мира
+          // Получаем мировые координаты
           const worldPos = new THREE.Vector3();
           const worldQuat = new THREE.Quaternion();
           trackingModel.object3D.getWorldPosition(worldPos);
           trackingModel.object3D.getWorldQuaternion(worldQuat);
 
-          // Создаем фиксированную модель
+          // Создаём новую модель
           const fixedModel = document.createElement("a-gltf-model");
           fixedModel.setAttribute("src", "#model");
           fixedModel.setAttribute("scale", "0.2 0.2 0.2");
 
-          // Назначаем позицию и поворот
-          fixedModel.object3D.position.copy(worldPos);
-          fixedModel.object3D.quaternion.copy(worldQuat);
+          // Ждём, пока модель загрузится, и только потом ставим позицию
+          fixedModel.addEventListener("model-loaded", () => {
+            fixedModel.object3D.position.copy(worldPos);
+            fixedModel.object3D.quaternion.copy(worldQuat);
+          });
 
           // Добавляем в сцену
           fixedContainer.appendChild(fixedModel);
 
-          // Скрываем маркер и трекинговую модель
+          // Скрываем маркер
           marker.setAttribute("visible", "false");
         });
       });
