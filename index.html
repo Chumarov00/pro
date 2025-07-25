@@ -2,99 +2,111 @@
 <html>
   <head>
     <meta charset="utf-8">
-    <title>MindAR Фиксация12</title>
+    <title>MindAR Fixation</title>
+
+    <!-- Подключение библиотек -->
     <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
+
     <style>
       body { margin: 0; overflow: hidden; }
-      #ar-container { width: 100vw; height: 100vh; position: fixed; top: 0; left: 0; }
+
+      #ar-container {
+        width: 100vw;
+        height: 100vh;
+        position: fixed;
+        top: 0; left: 0;
+      }
+
       #fix-button {
-        position: absolute;
-        bottom: 20px;
+        position: fixed;
+        bottom: 60px; /* Поднята над нижней панелью */
         left: 50%;
         transform: translateX(-50%);
-        padding: 12px 20px;
-        font-size: 16px;
-        background: #007bff;
+        z-index: 9999;
+        padding: 14px 28px;
+        font-size: 18px;
+        font-weight: bold;
+        background-color: rgba(0, 123, 255, 0.9);
         color: white;
         border: none;
-        border-radius: 8px;
-        z-index: 2;
+        border-radius: 10px;
+        box-shadow: 0 4px 8px rgba(0,0,0,0.4);
+        transition: background-color 0.2s ease;
+      }
+
+      #fix-button:active {
+        background-color: rgba(0, 90, 200, 1);
       }
     </style>
   </head>
   <body>
-    <div id="ar-container">
-      <button id="fix-button">Зафиксировать модель</button>
+    <!-- Кнопка фиксации -->
+    <button id="fix-button">✅ Зафиксировать модель</button>
 
-      <a-scene 
-        mindar-image="imageTargetSrc: https://chumarov00.github.io/pro/targets.mind;" 
-        vr-mode-ui="enabled: false" 
+    <!-- AR-сцена -->
+    <div id="ar-container">
+      <a-scene
+        mindar-image="imageTargetSrc: https://chumarov00.github.io/pro/targets.mind;"
+        vr-mode-ui="enabled: false"
         device-orientation-permission-ui="enabled: true"
         embedded
         renderer="colorManagement: true, physicallyCorrectLights"
-        id="scene">
-
+      >
         <a-assets>
           <a-asset-item id="model" src="https://chumarov00.github.io/pro/model.glb"></a-asset-item>
         </a-assets>
 
         <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
 
-        <!-- Обёртка модели с маркером -->
-        <a-entity mindar-image-target="targetIndex: 0" id="marker-target">
-          <a-gltf-model 
-            id="marker-model"
-            src="#model" 
-            position="0 0 0" 
-            rotation="0 0 0" 
+        <!-- Контейнер для модели -->
+        <a-entity id="model-container" mindar-image-target="targetIndex: 0">
+          <a-gltf-model
+            id="main-model"
+            src="#model"
+            position="0 0 0"
+            rotation="0 0 0"
             scale="0.2 0.2 0.2">
           </a-gltf-model>
         </a-entity>
-
-        <!-- Место для зафиксированной модели -->
-        <a-entity id="fixed-model-container"></a-entity>
       </a-scene>
     </div>
 
+    <!-- Скрипт для фиксации -->
     <script>
-      document.addEventListener("DOMContentLoaded", () => {
-        const fixButton = document.getElementById("fix-button");
-        const scene = document.querySelector("a-scene");
+      const button = document.getElementById('fix-button');
+      const container = document.querySelector('#model-container');
 
-        fixButton.addEventListener("click", () => {
-          const markerModel = document.querySelector("#marker-model");
-          const markerEntity = document.querySelector("#marker-target");
-          const fixedContainer = document.querySelector("#fixed-model-container");
+      let fixed = false;
 
-          if (markerModel && markerEntity && fixedContainer) {
-            // Получаем мировые координаты модели
-            const worldPosition = new THREE.Vector3();
-            const worldQuaternion = new THREE.Quaternion();
-            const worldScale = new THREE.Vector3();
+      button.addEventListener('click', () => {
+        if (fixed) return;
 
-            markerModel.object3D.updateMatrixWorld(true);
-            markerModel.object3D.matrixWorld.decompose(worldPosition, worldQuaternion, worldScale);
+        // Открепляем модель от трекинга маркера
+        const model = container.object3D;
+        const worldPos = new THREE.Vector3();
+        const worldQuat = new THREE.Quaternion();
+        const worldScale = new THREE.Vector3();
 
-            // Создаём новую фиксированную модель
-            const fixedModel = document.createElement("a-gltf-model");
-            fixedModel.setAttribute("src", "#model");
-            fixedModel.setAttribute("position", `${worldPosition.x} ${worldPosition.y} ${worldPosition.z}`);
-            
-            const euler = new THREE.Euler().setFromQuaternion(worldQuaternion);
-            fixedModel.setAttribute("rotation", `${THREE.Math.radToDeg(euler.x)} ${THREE.Math.radToDeg(euler.y)} ${THREE.Math.radToDeg(euler.z)}`);
+        model.getWorldPosition(worldPos);
+        model.getWorldQuaternion(worldQuat);
+        model.getWorldScale(worldScale);
 
-            fixedModel.setAttribute("scale", "0.2 0.2 0.2");
+        const scene = document.querySelector('a-scene').object3D;
+        const fixedModel = model.clone();
 
-            fixedContainer.appendChild(fixedModel);
+        // Убираем зависимость от маркера
+        container.parentNode.removeChild(container);
 
-            // Удаляем модель с маркера
-            markerEntity.parentNode.removeChild(markerEntity);
+        const newEntity = document.createElement('a-entity');
+        newEntity.setAttribute('position', `${worldPos.x} ${worldPos.y} ${worldPos.z}`);
+        newEntity.setAttribute('rotation', model.rotation);
+        newEntity.setAttribute('scale', '0.2 0.2 0.2');
+        newEntity.setAttribute('gltf-model', '#model');
 
-            // Прячем кнопку
-            fixButton.style.display = "none";
-          }
-        });
+        document.querySelector('a-scene').appendChild(newEntity);
+        fixed = true;
+        console.log('Модель зафиксирована!');
       });
     </script>
   </body>
