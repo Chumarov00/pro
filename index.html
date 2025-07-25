@@ -1,90 +1,85 @@
 <!DOCTYPE html>
 <html>
   <head>
-    <meta charset="utf-8">
-    <title>MindAR Fixation Final</title>
+    <meta charset="utf-8" />
+    <title>MindAR — Фиксация модели</title>
     <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.150.1/build/three.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.150.1/examples/js/loaders/GLTFLoader.js"></script>
     <style>
       body { margin: 0; overflow: hidden; }
-      #ar-container { width: 100vw; height: 100vh; position: fixed; top: 0; left: 0; }
       #fix-button {
         position: absolute;
         top: 20px;
-        left: 50%;
-        transform: translateX(-50%);
-        z-index: 10;
-        padding: 12px 24px;
-        font-size: 18px;
-        background-color: rgba(255, 255, 255, 0.9);
-        border: 2px solid #333;
-        border-radius: 10px;
+        left: 20px;
+        z-index: 999;
+        background: rgba(255, 255, 255, 0.9);
+        border: 2px solid #000;
+        padding: 10px 15px;
+        font-weight: bold;
         cursor: pointer;
       }
       #fix-button:active {
-        background-color: #ccc;
+        background: lightgreen;
       }
     </style>
   </head>
   <body>
-    <div id="ar-container">
-      <button id="fix-button">📌 Зафиксировать модель</button>
-      <a-scene 
-        mindar-image="imageTargetSrc: https://chumarov00.github.io/pro/targets.mind;" 
-        vr-mode-ui="enabled: false" 
-        device-orientation-permission-ui="enabled: true"
-        embedded
-        renderer="colorManagement: true, physicallyCorrectLights: true">
-        
-        <a-assets></a-assets>
+    <button id="fix-button">📌 Зафиксировать</button>
+    <a-scene
+      mindar-image="imageTargetSrc: https://chumarov00.github.io/pro/targets.mind"
+      vr-mode-ui="enabled: false"
+      device-orientation-permission-ui="enabled: true"
+      embedded
+      renderer="colorManagement: true, physicallyCorrectLights"
+    >
+      <a-assets>
+        <a-asset-item id="model" src="https://chumarov00.github.io/pro/model.glb"></a-asset-item>
+      </a-assets>
 
-        <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
+      <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
 
-        <a-entity id="marker" mindar-image-target="targetIndex: 0">
-          <a-entity id="model-anchor"></a-entity>
-        </a-entity>
-      </a-scene>
-    </div>
+      <!-- Маркер с моделью -->
+      <a-entity id="marker" mindar-image-target="targetIndex: 0">
+        <a-gltf-model id="tracked-model"
+          src="#model"
+          position="0 0 0"
+          scale="0.2 0.2 0.2"
+        ></a-gltf-model>
+      </a-entity>
+
+      <!-- Место для зафиксированной модели -->
+      <a-entity id="fixed-model" visible="false"></a-entity>
+    </a-scene>
 
     <script>
-      document.addEventListener("DOMContentLoaded", () => {
-        const scene = document.querySelector("a-scene").object3D;
-        const marker = document.getElementById("marker");
-        const modelAnchor = document.getElementById("model-anchor").object3D;
-        const button = document.getElementById("fix-button");
+      const sceneEl = document.querySelector('a-scene');
+      const button = document.getElementById('fix-button');
+      const trackedModel = document.getElementById('tracked-model');
+      const fixedModel = document.getElementById('fixed-model');
+      const marker = document.getElementById('marker');
 
-        const loader = new THREE.GLTFLoader();
-        let gltfModel = null;
-        let fixed = false;
+      let fixed = false;
 
-        loader.load("https://chumarov00.github.io/pro/model.glb", (gltf) => {
-          gltfModel = gltf.scene;
-          gltfModel.scale.set(0.2, 0.2, 0.2);
-          modelAnchor.add(gltfModel.clone()); // Показываем на маркере
-        });
+      button.addEventListener('click', () => {
+        if (fixed) return;
+        fixed = true;
 
-        button.addEventListener("click", () => {
-          if (fixed || !gltfModel) return;
-          fixed = true;
+        // Получаем позицию и поворот отслеженной модели
+        const position = trackedModel.object3D.getWorldPosition(new THREE.Vector3());
+        const rotation = trackedModel.object3D.getWorldRotation(new THREE.Euler());
 
-          // Получаем мировые координаты якоря
-          const worldPos = new THREE.Vector3();
-          const worldQuat = new THREE.Quaternion();
-          modelAnchor.getWorldPosition(worldPos);
-          modelAnchor.getWorldQuaternion(worldQuat);
+        // Создаём зафиксированную модель
+        const gltf = document.createElement('a-gltf-model');
+        gltf.setAttribute('src', '#model');
+        gltf.setAttribute('scale', '0.2 0.2 0.2');
+        gltf.object3D.position.copy(position);
+        gltf.object3D.rotation.copy(rotation);
 
-          // Клонируем модель и добавляем в сцену
-          const fixedModel = gltfModel.clone(true);
-          fixedModel.position.copy(worldPos);
-          fixedModel.quaternion.copy(worldQuat);
-          fixedModel.scale.set(0.2, 0.2, 0.2);
-          scene.add(fixedModel);
+        fixedModel.appendChild(gltf);
+        fixedModel.setAttribute('visible', 'true');
 
-          // Отключаем маркер
-          marker.setAttribute("visible", "false");
-        });
+        // Отключаем маркер и камеру MindAR
+        marker.setAttribute('visible', 'false');
       });
     </script>
   </body>
