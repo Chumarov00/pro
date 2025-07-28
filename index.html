@@ -2,7 +2,7 @@
 <html>
   <head>
     <meta charset="utf-8">
-    <title>MindAR Fix Model12</title>
+    <title>MindAR Fix Model</title>
     <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
     <style>
@@ -11,21 +11,11 @@
         padding: 0;
         overflow: hidden;
         height: 100%;
-        width: 100%;
-        background: black;
-      }
-
-      a-scene {
-        position: absolute !important;
-        top: 0;
-        left: 0;
-        height: 100% !important;
-        width: 100% !important;
-        z-index: 0;
+        background-color: black;
       }
 
       #fix-button {
-        position: absolute;
+        position: fixed;
         top: 20px;
         left: 50%;
         transform: translateX(-50%);
@@ -36,7 +26,7 @@
         color: white;
         border: none;
         border-radius: 10px;
-        z-index: 10;
+        z-index: 9999;
         cursor: pointer;
         transition: background-color 0.3s, transform 0.1s;
         box-shadow: 0 2px 8px rgba(0,0,0,0.2);
@@ -57,68 +47,64 @@
   <body>
     <button id="fix-button">Зафиксировать</button>
 
-    <a-scene 
-      mindar-image="imageTargetSrc: https://chumarov00.github.io/pro/targets.mind;" 
-      vr-mode-ui="enabled: false" 
-      device-orientation-permission-ui="enabled: true"
+    <a-scene
+      mindar-image="imageTargetSrc: https://chumarov00.github.io/pro/targets.mind; autoStart: true"
       embedded
+      vr-mode-ui="enabled: false"
+      device-orientation-permission-ui="enabled: true"
       renderer="colorManagement: true, physicallyCorrectLights"
-      id="scene">
-
+    >
       <a-assets>
         <a-asset-item id="model" src="https://chumarov00.github.io/pro/model.glb"></a-asset-item>
       </a-assets>
 
       <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
 
-      <a-entity id="model-container" mindar-image-target="targetIndex: 0">
+      <a-entity id="marker" mindar-image-target="targetIndex: 0">
         <a-gltf-model 
           id="tracked-model"
-          src="#model" 
-          position="0 0 0" 
-          rotation="0 0 0" 
+          src="#model"
+          position="0 0 0"
+          rotation="0 0 0"
           scale="0.2 0.2 0.2">
         </a-gltf-model>
       </a-entity>
     </a-scene>
 
     <script>
-      const button = document.getElementById('fix-button');
+      const fixButton = document.getElementById('fix-button');
       const modelEntity = document.getElementById('tracked-model');
-      const trackedParent = document.getElementById('model-container');
+      const marker = document.getElementById('marker');
       let fixed = false;
 
-      button.addEventListener('click', () => {
+      fixButton.addEventListener('click', () => {
         if (fixed) return;
 
         const model = modelEntity.object3D;
-        const worldPos = new THREE.Vector3();
-        const worldQuat = new THREE.Quaternion();
-        const worldEuler = new THREE.Euler();
-        const worldScale = new THREE.Vector3();
+        const pos = new THREE.Vector3();
+        const quat = new THREE.Quaternion();
+        const scale = new THREE.Vector3();
+        const euler = new THREE.Euler();
 
-        model.getWorldPosition(worldPos);
-        model.getWorldQuaternion(worldQuat);
-        model.getWorldScale(worldScale);
-        worldEuler.setFromQuaternion(worldQuat);
+        model.getWorldPosition(pos);
+        model.getWorldQuaternion(quat);
+        model.getWorldScale(scale);
+        euler.setFromQuaternion(quat);
 
-        // Скрыть оригинальную модель, привязанную к маркеру
-        trackedParent.setAttribute('visible', 'false');
+        // Скрыть оригинальный marker
+        marker.setAttribute('visible', 'false');
 
-        // Создать новую зафиксированную модель
+        // Создать новую фиксированную модель
         const newEntity = document.createElement('a-entity');
         newEntity.setAttribute('gltf-model', '#model');
-        newEntity.setAttribute('position', `${worldPos.x} ${worldPos.y} ${worldPos.z}`);
-        newEntity.setAttribute('rotation', `${THREE.Math.radToDeg(worldEuler.x)} ${THREE.Math.radToDeg(worldEuler.y)} ${THREE.Math.radToDeg(worldEuler.z)}`);
+        newEntity.setAttribute('position', `${pos.x} ${pos.y} ${pos.z}`);
+        newEntity.setAttribute('rotation', `${THREE.Math.radToDeg(euler.x)} ${THREE.Math.radToDeg(euler.y)} ${THREE.Math.radToDeg(euler.z)}`);
         newEntity.setAttribute('scale', '0.2 0.2 0.2');
-
-        // Добавить в сцену
         document.querySelector('a-scene').appendChild(newEntity);
 
-        // Обозначить фиксацию
         fixed = true;
-        button.classList.add('fixed');
-        button.textContent = 'Зафиксировано';
+        fixButton.classList.add('fixed');
+        fixButton.textContent = 'Зафиксировано';
       });
     </script>
   </body>
