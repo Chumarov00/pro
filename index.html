@@ -2,55 +2,24 @@
 <html>
   <head>
     <meta charset="utf-8" />
-    <title>MindAR Fixed Model12</title>
+    <title>MindAR Basic Working Scene</title>
 
-    <!-- A-Frame и MindAR -->
+    <!-- A-Frame + MindAR -->
     <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
 
     <style>
-      body, html {
+      html, body {
         margin: 0;
         padding: 0;
         overflow: hidden;
-        background: black;
         height: 100%;
         width: 100%;
-      }
-
-      #fix-button {
-        position: absolute;
-        top: 20px;
-        left: 50%;
-        transform: translateX(-50%);
-        padding: 12px 24px;
-        font-size: 18px;
-        font-weight: bold;
-        background-color: rgba(0, 123, 255, 0.9);
-        color: white;
-        border: none;
-        border-radius: 10px;
-        z-index: 100;
-        cursor: pointer;
-        transition: background-color 0.3s, transform 0.1s;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-      }
-
-      #fix-button:active {
-        background-color: rgba(0, 90, 190, 1);
-        transform: translateX(-50%) scale(0.96);
-      }
-
-      #fix-button.fixed {
-        background-color: green;
-        pointer-events: none;
-        opacity: 0.85;
+        background-color: black;
       }
     </style>
   </head>
   <body>
-    <button id="fix-button">Зафиксировать</button>
-
     <a-scene
       mindar-image="imageTargetSrc: https://chumarov00.github.io/pro/targets.mind"
       embedded
@@ -58,7 +27,6 @@
       renderer="colorManagement: true, physicallyCorrectLights: true"
       vr-mode-ui="enabled: false"
       device-orientation-permission-ui="enabled: true"
-      id="scene"
     >
       <a-assets>
         <a-asset-item id="model" src="https://chumarov00.github.io/pro/model.glb"></a-asset-item>
@@ -66,50 +34,13 @@
 
       <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
 
-      <!-- Привязанная к маркеру модель -->
-      <a-entity id="tracked-target" mindar-image-target="targetIndex: 0">
-        <a-gltf-model id="tracked-model" src="#model" position="0 0 0" scale="0.2 0.2 0.2"></a-gltf-model>
+      <a-entity mindar-image-target="targetIndex: 0">
+        <a-gltf-model
+          src="#model"
+          position="0 0 0"
+          scale="0.2 0.2 0.2"
+        ></a-gltf-model>
       </a-entity>
     </a-scene>
-
-    <script>
-      const button = document.getElementById('fix-button');
-      const trackedEntity = document.getElementById('tracked-model');
-      const target = document.getElementById('tracked-target');
-      let fixed = false;
-
-      button.addEventListener('click', () => {
-        if (fixed) return;
-
-        const scene = document.querySelector('a-scene');
-        const model3D = trackedEntity.object3D;
-
-        // Получаем мировые координаты
-        const worldPos = new THREE.Vector3();
-        const worldQuat = new THREE.Quaternion();
-        const worldScale = new THREE.Vector3();
-        model3D.getWorldPosition(worldPos);
-        model3D.getWorldQuaternion(worldQuat);
-        model3D.getWorldScale(worldScale);
-
-        const worldEuler = new THREE.Euler().setFromQuaternion(worldQuat);
-
-        // Скрываем отслеживаемую модель
-        target.setAttribute('visible', false);
-
-        // Создаем новую независимую модель
-        const fixedEntity = document.createElement('a-entity');
-        fixedEntity.setAttribute('gltf-model', '#model');
-        fixedEntity.setAttribute('position', `${worldPos.x} ${worldPos.y} ${worldPos.z}`);
-        fixedEntity.setAttribute('rotation', `${THREE.Math.radToDeg(worldEuler.x)} ${THREE.Math.radToDeg(worldEuler.y)} ${THREE.Math.radToDeg(worldEuler.z)}`);
-        fixedEntity.setAttribute('scale', '0.2 0.2 0.2');
-        scene.appendChild(fixedEntity);
-
-        // Обновляем UI кнопки
-        button.classList.add('fixed');
-        button.textContent = 'Зафиксировано';
-        fixed = true;
-      });
-    </script>
   </body>
 </html>
