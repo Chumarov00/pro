@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <title>Marker AR (MindAR)</title>
+
+  <!-- Для странных браузеров (Huawei/Tecno) -->
+  <script src="https://webrtc.github.io/adapter/adapter-latest.js"></script>
+
+  <!-- A-Frame + MindAR -->
+  <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
+
+  <style>
+    html, body { margin:0; padding:0; height:100%; width:100%; overflow:hidden; background:#000; }
+    #topbar {
+      position:fixed; top:10px; left:0; right:0; display:flex; gap:10px; justify-content:center;
+      z-index:9999; padding:0 10px;
+    }
+    .btn {
+      padding:10px 16px; font-size:15px; font-weight:700; border:0; border-radius:10px; cursor:pointer;
+      box-shadow:0 2px 8px rgba(0,0,0,.35);
+    }
+    #btnXR { background:#0a7bff; color:#fff; }
+    #btnXR:disabled { background:#5c8fd6; cursor:not-allowed; }
+    #hint {
+      position:fixed; bottom:10px; left:0; right:0; color:#fff; text-align:center; font:14px/1.4 system-ui; opacity:.8; z-index:9999;
+      padding:0 12px;
+    }
+  </style>
+
+  <script>
+    // Лёгкий фильтр — сглаживает дрожание модели на маркере
+    AFRAME.registerComponent('pose-smoother', {
+      schema:{ lerp:{default:0.18} },
+      init(){
+        const T = AFRAME.THREE;
+        this._tmpPos = new T.Vector3();
+        this._tmpQuat= new T.Quaternion();
+      },
+      tick(){
+        const o = this.el.object3D;
+        // плавно тянем к целевым значениям
+        o.position.lerp(this._tmpPos.copy(o.position), this.data.lerp);
+        AFRAME.THREE.Quaternion.slerp(o.quaternion, this._tmpQuat.copy(o.quaternion), o.quaternion, this.data.lerp);
+      }
+    });
+  </script>
+</head>
+<body>
+  <div id="topbar">
+    <button id="btnXR" class="btn" disabled>Проверяем XR…</button>
+  </div>
+  <div id="hint">Наведи камеру на маркер. Для «настоящей» фиксации нажми «Перейти в AR-режим» (если поддерживается).</div>
+
+  <a-scene
+    mindar-image="imageTargetSrc: https://chumarov00.github.io/pro/targets.mind"
+    embedded color-space="sRGB"
+    renderer="colorManagement: true, physicallyCorrectLights: true"
+    vr-mode-ui="enabled: false"
+    device-orientation-permission-ui="enabled: true"
+    id="scene">
+    <a-assets>
+      <a-asset-item id="model" src="https://chumarov00.github.io/pro/model.glb"></a-asset-item>
+    </a-assets>
+
+    <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
+
+    <a-entity id="marker" mindar-image-target="targetIndex: 0">
+      <a-gltf-model id="tracked" src="#model" scale="0.2 0.2 0.2" pose-smoother></a-gltf-model>
+    </a-entity>
+  </a-scene>
+
+  <script>
+    // Предзапрос камеры — помогает на Huawei/Tecno
+    if (navigator.mediaDevices?.getUserMedia) {
+      navigator.mediaDevices.getUserMedia({ video: true }).catch(()=>{});
+    }
+
+    const btnXR = document.getElementById('btnXR');
+
+    // Проверяем поддержку WebXR AR
+    (async () => {
+      try {
+        const ok = !!(navigator.xr && await navigator.xr.isSessionSupported('immersive-ar'));
+        if (ok) {
+          btnXR.textContent = 'Перейти в AR-режим (XR)';
+          btnXR.disabled = false;
+          btnXR.onclick = () => location.href = 'xr.html';
+        } else {
+          btnXR.textContent = 'AR-режим (XR) недоступен';
+          btnXR.disabled = true;
+        }
+      } catch {
+        btnXR.textContent = 'AR-режим (XR) недоступен';
+        btnXR.disabled = true;
+      }
+    })();
+  </script>
+</body>
+</html>
