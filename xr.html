@@ -2,30 +2,25 @@
 <html lang="ru">
 <head>
   <meta charset="utf-8" />
-  <title>World AR (WebXR Hit-Test)</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"/>
+  <title>World AR (WebXR)</title>
   <style>
-    html, body { margin:0; height:100%; background:#000; overflow:hidden; }
-    #overlay {
-      position:fixed; top:0; left:0; right:0; display:flex; justify-content:center; z-index:10; padding:10px;
-    }
-    #placeBtn {
-      padding:10px 16px; font-size:15px; font-weight:700; border:0; border-radius:10px; cursor:pointer;
-      background:#0a7bff; color:#fff; box-shadow:0 2px 8px rgba(0,0,0,.35);
-    }
-    #backBtn {
-      margin-left:8px; padding:10px 16px; font-size:15px; font-weight:700; border:0; border-radius:10px; cursor:pointer;
-      background:#333; color:#fff; box-shadow:0 2px 8px rgba(0,0,0,.35);
-    }
-    #hint { position:fixed; bottom:10px; left:0; right:0; text-align:center; color:#fff; font:14px/1.4 system-ui; opacity:.85; }
+    html,body { margin:0; height:100%; background:#000; overflow:hidden; }
+    #overlay { position:fixed; top:10px; left:0; right:0; display:flex; justify-content:center; gap:8px; z-index:10; }
+    .btn { padding:10px 16px; font-size:15px; font-weight:700; border:0; border-radius:10px; box-shadow:0 2px 8px rgba(0,0,0,.35); color:#fff; }
+    #place { background:#0a7bff; }
+    #back  { background:#444; }
+    #hint  { position:fixed; bottom:10px; left:0; right:0; text-align:center; color:#fff; font:14px/1.4 system-ui; opacity:.9; z-index:10; }
+    #unsupported { position:fixed; inset:0; display:flex; align-items:center; justify-content:center; color:#fff; font:18px/1.4 system-ui; text-align:center; padding:20px; }
   </style>
 </head>
 <body>
-  <div id="overlay">
-    <button id="placeBtn" disabled>Наведите на плоскость…</button>
-    <button id="backBtn" onclick="location.href='marker.html'">← К маркеру</button>
+  <div id="unsupported" style="display:none">XR не поддерживается этим устройством/браузером.<br/>Используйте страницу marker.html.</div>
+  <div id="overlay" style="display:none">
+    <button id="place" class="btn">Разместить</button>
+    <button id="back" class="btn" onclick="location.href='marker.html'">← К маркеру</button>
   </div>
-  <div id="hint">Двигай телефон, дождись круга-ретикла. Нажми «Разместить», чтобы поставить модель и обойти её вокруг.</div>
+  <div id="hint" style="display:none">Двигай телефон, дождись зелёного круга-ретикла, затем нажми «Разместить».</div>
 
   <script type="module">
     import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.152.2/build/three.module.js';
@@ -34,87 +29,68 @@
 
     const MODEL_URL = 'https://chumarov00.github.io/pro/model.glb';
 
-    let camera, scene, renderer;
-    let reticle, hitTestSource = null, hitTestSpace = null, xrRefSpace = null;
+    const supported = (navigator.xr && await navigator.xr.isSessionSupported?.('immersive-ar'));
+    if (!supported) {
+      document.getElementById('unsupported').style.display = 'flex';
+      throw new Error('XR unsupported');
+    }
+    document.getElementById('overlay').style.display = '';
+    document.getElementById('hint').style.display = '';
+
+    let camera, scene, renderer, reticle, hitSource = null, refSpace = null;
     let placed = false;
-    const placeBtn = document.getElementById('placeBtn');
 
-    init();
-    function init() {
-      // renderer
-      renderer = new THREE.WebGLRenderer({ antialias:true, alpha:true });
-      renderer.setPixelRatio(window.devicePixelRatio);
-      renderer.setSize(window.innerWidth, window.innerHeight);
-      renderer.xr.enabled = true;
-      document.body.appendChild(renderer.domElement);
+    renderer = new THREE.WebGLRenderer({ antialias:true, alpha:true });
+    renderer.setPixelRatio(window.devicePixelRatio);
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.xr.enabled = true;
+    document.body.appendChild(renderer.domElement);
 
-      // scene & camera
-      scene = new THREE.Scene();
-      camera = new THREE.PerspectiveCamera(70, window.innerWidth/window.innerHeight, 0.01, 20);
-      scene.add(camera);
+    scene = new THREE.Scene();
+    camera = new THREE.PerspectiveCamera(70, window.innerWidth/window.innerHeight, 0.01, 20);
+    scene.add(camera);
 
-      // reticle
-      const ringGeo = new THREE.RingGeometry(0.07, 0.08, 32).rotateX(-Math.PI/2);
-      const ringMat = new THREE.MeshBasicMaterial({ color: 0x2ecc71 });
-      reticle = new THREE.Mesh(ringGeo, ringMat);
-      reticle.matrixAutoUpdate = false;
-      reticle.visible = false;
-      scene.add(reticle);
+    // reticle (зелёный кружок)
+    const ring = new THREE.RingGeometry(0.07, 0.085, 32).rotateX(-Math.PI/2);
+    reticle = new THREE.Mesh(ring, new THREE.MeshBasicMaterial({ color:0x2ecc71 }));
+    reticle.matrixAutoUpdate = false; reticle.visible = false;
+    scene.add(reticle);
 
-      // AR button
-      const btn = ARButton.createButton(renderer, {
-        requiredFeatures: ['hit-test'],
-        optionalFeatures: ['dom-overlay', 'anchors'],
-        domOverlay: { root: document.body }
-      });
-      document.body.appendChild(btn);
+    // AR Button (системная кнопка входа в XR)
+    document.body.appendChild(ARButton.createButton(renderer, { requiredFeatures:['hit-test'] }));
 
-      renderer.setAnimationLoop(render);
-
-      // tap to place by button
-      placeBtn.addEventListener('click', async () => {
-        if (!reticle.visible || placed) return;
-        placed = true;
-        placeBtn.textContent = 'Размещено';
-        placeBtn.disabled = true;
-
-        // загрузка модели
-        const gltf = await new GLTFLoader().loadAsync(MODEL_URL);
-        const obj = gltf.scene;
-        obj.scale.set(0.2, 0.2, 0.2);
-        obj.matrixAutoUpdate = false;
-        obj.applyMatrix4(reticle.matrix); // копируем мировую матрицу точки
-        obj.updateMatrix();
-        scene.add(obj);
-      });
-
-      window.addEventListener('resize', onResize);
-    }
-
-    function onResize() {
-      camera.aspect = window.innerWidth/window.innerHeight;
-      camera.updateProjectionMatrix();
-      renderer.setSize(window.innerWidth, window.innerHeight);
-    }
-
-    // WebXR session lifecycle
+    // Сессия
     renderer.xr.addEventListener('sessionstart', async () => {
       const session = renderer.xr.getSession();
-      xrRefSpace = await session.requestReferenceSpace('local');
-      const viewerSpace = await session.requestReferenceSpace('viewer');
-      hitTestSource = await session.requestHitTestSource({ space: viewerSpace });
-      placeBtn.disabled = false;
+      refSpace = await session.requestReferenceSpace('local');
+      const viewer = await session.requestReferenceSpace('viewer');
+      hitSource = await session.requestHitTestSource({ space: viewer });
 
-      session.addEventListener('end', () => {
-        hitTestSource = null; hitTestSpace = null; xrRefSpace = null;
-      });
+      session.addEventListener('end', () => { hitSource = null; refSpace = null; });
     });
 
-    function render(timestamp, frame) {
-      if (frame && hitTestSource && !placed) {
-        const results = frame.getHitTestResults(hitTestSource);
-        if (results.length > 0) {
-          const pose = results[0].getPose(xrRefSpace);
+    // Размещение модели
+    document.getElementById('place').onclick = async () => {
+      if (!reticle.visible || placed) return;
+      placed = true;
+      document.getElementById('place').textContent = 'Размещено';
+      document.getElementById('place').disabled = true;
+
+      const gltf = await new GLTFLoader().loadAsync(MODEL_URL);
+      const obj = gltf.scene;
+      obj.scale.set(0.2, 0.2, 0.2);
+      obj.matrixAutoUpdate = false;
+      obj.applyMatrix4(reticle.matrix);
+      obj.updateMatrix();
+      scene.add(obj);
+    };
+
+    // Рендер-цикл
+    renderer.setAnimationLoop((time, frame) => {
+      if (frame && hitSource && !placed) {
+        const hits = frame.getHitTestResults(hitSource);
+        if (hits.length) {
+          const pose = hits[0].getPose(refSpace);
           reticle.visible = true;
           reticle.matrix.fromArray(pose.transform.matrix);
         } else {
@@ -122,7 +98,14 @@
         }
       }
       renderer.render(scene, camera);
-    }
+    });
+
+    // resize
+    addEventListener('resize', () => {
+      camera.aspect = innerWidth/innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(innerWidth, innerHeight);
+    });
   </script>
 </body>
 </html>
