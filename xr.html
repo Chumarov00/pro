@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"/>
-  <title>World AR (WebXR)</title>
+  <title>World AR12 (WebXR)</title>
   <style>
     html,body { margin:0; height:100%; background:#000; overflow:hidden; }
     #overlay { position:fixed; top:10px; left:0; right:0; display:flex; justify-content:center; gap:8px; z-index:10; }
@@ -18,7 +18,7 @@
   <div id="unsupported" style="display:none">XR не поддерживается этим устройством/браузером.<br/>Используйте страницу marker.html.</div>
   <div id="overlay" style="display:none">
     <button id="place" class="btn">Разместить</button>
-    <button id="back" class="btn" onclick="location.href='marker.html'">← К маркеру</button>
+    <button id="back"  class="btn" onclick="location.href='marker.html'">← К маркеру</button>
   </div>
   <div id="hint" style="display:none">Двигай телефон, дождись зелёного круга-ретикла, затем нажми «Разместить».</div>
 
@@ -29,83 +29,96 @@
 
     const MODEL_URL = 'https://chumarov00.github.io/pro/model.glb';
 
-    const supported = (navigator.xr && await navigator.xr.isSessionSupported?.('immersive-ar'));
-    if (!supported) {
-      document.getElementById('unsupported').style.display = 'flex';
-      throw new Error('XR unsupported');
-    }
-    document.getElementById('overlay').style.display = '';
-    document.getElementById('hint').style.display = '';
+    // ❌ никаких top-level await — чтобы не было синтаксической ошибки в старых браузерах
+    checkXR();
 
-    let camera, scene, renderer, reticle, hitSource = null, refSpace = null;
-    let placed = false;
-
-    renderer = new THREE.WebGLRenderer({ antialias:true, alpha:true });
-    renderer.setPixelRatio(window.devicePixelRatio);
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    renderer.xr.enabled = true;
-    document.body.appendChild(renderer.domElement);
-
-    scene = new THREE.Scene();
-    camera = new THREE.PerspectiveCamera(70, window.innerWidth/window.innerHeight, 0.01, 20);
-    scene.add(camera);
-
-    // reticle (зелёный кружок)
-    const ring = new THREE.RingGeometry(0.07, 0.085, 32).rotateX(-Math.PI/2);
-    reticle = new THREE.Mesh(ring, new THREE.MeshBasicMaterial({ color:0x2ecc71 }));
-    reticle.matrixAutoUpdate = false; reticle.visible = false;
-    scene.add(reticle);
-
-    // AR Button (системная кнопка входа в XR)
-    document.body.appendChild(ARButton.createButton(renderer, { requiredFeatures:['hit-test'] }));
-
-    // Сессия
-    renderer.xr.addEventListener('sessionstart', async () => {
-      const session = renderer.xr.getSession();
-      refSpace = await session.requestReferenceSpace('local');
-      const viewer = await session.requestReferenceSpace('viewer');
-      hitSource = await session.requestHitTestSource({ space: viewer });
-
-      session.addEventListener('end', () => { hitSource = null; refSpace = null; });
-    });
-
-    // Размещение модели
-    document.getElementById('place').onclick = async () => {
-      if (!reticle.visible || placed) return;
-      placed = true;
-      document.getElementById('place').textContent = 'Размещено';
-      document.getElementById('place').disabled = true;
-
-      const gltf = await new GLTFLoader().loadAsync(MODEL_URL);
-      const obj = gltf.scene;
-      obj.scale.set(0.2, 0.2, 0.2);
-      obj.matrixAutoUpdate = false;
-      obj.applyMatrix4(reticle.matrix);
-      obj.updateMatrix();
-      scene.add(obj);
-    };
-
-    // Рендер-цикл
-    renderer.setAnimationLoop((time, frame) => {
-      if (frame && hitSource && !placed) {
-        const hits = frame.getHitTestResults(hitSource);
-        if (hits.length) {
-          const pose = hits[0].getPose(refSpace);
-          reticle.visible = true;
-          reticle.matrix.fromArray(pose.transform.matrix);
-        } else {
-          reticle.visible = false;
-        }
+    async function checkXR() {
+      if (!('xr' in navigator)) return showUnsupported();
+      try {
+        const ok = await navigator.xr.isSessionSupported('immersive-ar');
+        if (!ok) return showUnsupported();
+        startXR();
+      } catch {
+        showUnsupported();
       }
-      renderer.render(scene, camera);
-    });
+    }
 
-    // resize
-    addEventListener('resize', () => {
-      camera.aspect = innerWidth/innerHeight;
-      camera.updateProjectionMatrix();
-      renderer.setSize(innerWidth, innerHeight);
-    });
+    function showUnsupported() {
+      document.getElementById('unsupported').style.display = 'flex';
+    }
+
+    async function startXR() {
+      document.getElementById('overlay').style.display = '';
+      document.getElementById('hint').style.display = '';
+
+      let camera, scene, renderer, reticle, hitSource = null, refSpace = null, placed = false;
+
+      renderer = new THREE.WebGLRenderer({ antialias:true, alpha:true });
+      renderer.setPixelRatio(window.devicePixelRatio);
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.xr.enabled = true;
+      document.body.appendChild(renderer.domElement);
+
+      scene = new THREE.Scene();
+      camera = new THREE.PerspectiveCamera(70, window.innerWidth/window.innerHeight, 0.01, 20);
+      scene.add(camera);
+
+      // reticle (зелёный кружок)
+      const ring = new THREE.RingGeometry(0.07, 0.085, 32).rotateX(-Math.PI/2);
+      reticle = new THREE.Mesh(ring, new THREE.MeshBasicMaterial({ color:0x2ecc71 }));
+      reticle.matrixAutoUpdate = false; reticle.visible = false;
+      scene.add(reticle);
+
+      // системная кнопка входа в XR
+      document.body.appendChild(ARButton.createButton(renderer, { requiredFeatures:['hit-test'] }));
+
+      // сессия
+      renderer.xr.addEventListener('sessionstart', async () => {
+        const session = renderer.xr.getSession();
+        refSpace = await session.requestReferenceSpace('local');
+        const viewer = await session.requestReferenceSpace('viewer');
+        hitSource = await session.requestHitTestSource({ space: viewer });
+        session.addEventListener('end', () => { hitSource = null; refSpace = null; });
+      });
+
+      // Разместить модель
+      document.getElementById('place').onclick = async () => {
+        if (!reticle.visible || placed) return;
+        placed = true;
+        document.getElementById('place').textContent = 'Размещено';
+        document.getElementById('place').disabled = true;
+
+        const gltf = await new GLTFLoader().loadAsync(MODEL_URL);
+        const obj = gltf.scene;
+        obj.scale.set(0.2, 0.2, 0.2);
+        obj.matrixAutoUpdate = false;
+        obj.applyMatrix4(reticle.matrix);
+        obj.updateMatrix();
+        scene.add(obj);
+      };
+
+      // рендер-цикл
+      renderer.setAnimationLoop((time, frame) => {
+        if (frame && hitSource && !placed) {
+          const hits = frame.getHitTestResults(hitSource);
+          if (hits.length) {
+            const pose = hits[0].getPose(refSpace);
+            reticle.visible = true;
+            reticle.matrix.fromArray(pose.transform.matrix);
+          } else {
+            reticle.visible = false;
+          }
+        }
+        renderer.render(scene, camera);
+      });
+
+      // resize
+      addEventListener('resize', () => {
+        camera.aspect = innerWidth/innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(innerWidth, innerHeight);
+      });
+    }
   </script>
 </body>
 </html>
