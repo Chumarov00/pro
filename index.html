@@ -1,100 +1,119 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <meta charset="utf-8">
-  <title>MindAR — Фиксация модели</title>
+  <meta charset="utf-8" />
+  <title>MindAR — фиксация модели12</title>
+
+  <!-- Полезно для совместимости камеры (особенно Huawei/Tecno) -->
+  <script src="https://webrtc.github.io/adapter/adapter-latest.js"></script>
+
+  <!-- A-Frame + MindAR -->
   <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
+
   <style>
-    body { margin: 0; overflow: hidden; }
-    #fix-button {
-      position: fixed;
-      top: 15px;
-      left: 50%;
-      transform: translateX(-50%);
-      padding: 12px 24px;
-      font-size: 18px;
-      font-weight: bold;
-      background-color: rgba(0, 123, 255, 0.9);
-      color: white;
-      border: none;
-      border-radius: 10px;
+    html, body {
+      margin: 0; padding: 0;
+      height: 100%; width: 100%;
+      overflow: hidden; background: #000;
+    }
+    /* Кнопка всегда видна сверху */
+    #fixButton {
+      position: fixed; top: 14px; left: 50%; transform: translateX(-50%);
       z-index: 9999;
-      cursor: pointer;
-      transition: background-color 0.3s, transform 0.1s;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+      padding: 12px 20px; font-size: 16px; font-weight: 700;
+      background: rgba(0,123,255,.95); color: #fff; border: 0; border-radius: 10px;
+      box-shadow: 0 2px 8px rgba(0,0,0,.35); cursor: pointer;
+      transition: background .2s, transform .06s;
     }
-    #fix-button:active {
-      background-color: rgba(0, 90, 190, 1);
-      transform: translateX(-50%) scale(0.96);
-    }
-    #fix-button.fixed {
-      background-color: green;
-      pointer-events: none;
-      opacity: 0.8;
-    }
+    #fixButton:active { background: rgba(0,90,190,1); transform: translateX(-50%) scale(.97); }
+    #fixButton.fixed { background: #2e7d32; opacity: .9; pointer-events: none; }
   </style>
 </head>
 <body>
-  <button id="fix-button">Зафиксировать</button>
+  <button id="fixButton" disabled>Сканируй маркер…</button>
 
-  <a-scene 
-    mindar-image="imageTargetSrc: https://chumarov00.github.io/pro/targets.mind;" 
-    vr-mode-ui="enabled: false" 
-    device-orientation-permission-ui="enabled: true"
+  <a-scene
+    mindar-image="imageTargetSrc: https://chumarov00.github.io/pro/targets.mind"
     embedded
-    renderer="colorManagement: true, physicallyCorrectLights">
-
+    color-space="sRGB"
+    renderer="colorManagement: true, physicallyCorrectLights: true"
+    vr-mode-ui="enabled: false"
+    device-orientation-permission-ui="enabled: true"
+    id="scene">
+    
     <a-assets>
       <a-asset-item id="model" src="https://chumarov00.github.io/pro/model.glb"></a-asset-item>
     </a-assets>
 
     <a-camera position="0 0 0"></a-camera>
 
-    <a-entity id="target" mindar-image-target="targetIndex: 0">
-      <a-entity 
-        id="tracked-model"
-        gltf-model="#model"
-        scale="0.2 0.2 0.2"
-        position="0 0 0"
-        rotation="0 0 0">
-      </a-entity>
+    <!-- Якорь маркера -->
+    <a-entity id="marker" mindar-image-target="targetIndex: 0">
+      <!-- Модель, привязанная к маркеру -->
+      <a-entity id="trackedModel" gltf-model="#model" position="0 0 0" scale="0.2 0.2 0.2"></a-entity>
     </a-entity>
   </a-scene>
 
   <script>
-    const button = document.getElementById('fix-button');
-    const sceneObj = document.querySelector('a-scene').object3D;
-    const trackedEntity = document.getElementById('tracked-model').object3D;
-    const target = document.getElementById('target');
-    let fixed = false;
-
-    // Для Huawei/Tecno: предварительно запрашиваем доступ к камере
-    if (navigator.mediaDevices?.getUserMedia) {
+    // 1) Предзапрос камеры для "капризных" устройств
+    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
       navigator.mediaDevices.getUserMedia({ video: true }).catch(() => {});
     }
 
-    button.addEventListener('click', () => {
-      if (fixed) return;
+    const btn = document.getElementById('fixButton');
+    const sceneEl = document.getElementById('scene');
+    const markerEl = document.getElementById('marker');
+    const trackedEl = document.getElementById('trackedModel');
 
-      // Клонируем модель
-      const clone = trackedEntity.clone(true);
+    const THREE = AFRAME.THREE; // ключ к правильным классам
+    let canFix = false;
+    let fixedOnce = false;
 
-      // Копируем мировые координаты и ориентацию
-      clone.position.copy(trackedEntity.getWorldPosition(new THREE.Vector3()));
-      clone.quaternion.copy(trackedEntity.getWorldQuaternion(new THREE.Quaternion()));
-      clone.scale.copy(trackedEntity.getWorldScale(new THREE.Vector3()));
+    // 2) Разрешаем кнопку только когда маркер реально найден
+    markerEl.addEventListener('targetFound', () => {
+      canFix = true;
+      if (!fixedOnce) btn.disabled = false, btn.textContent = '📌 Зафиксировать';
+    });
+    markerEl.addEventListener('targetLost', () => {
+      canFix = false;
+      if (!fixedOnce) btn.disabled = true, btn.textContent = 'Сканируй маркер…';
+    });
 
-      // Добавляем копию в мировую сцену
-      sceneObj.add(clone);
+    btn.addEventListener('click', () => {
+      if (fixedOnce || !canFix) return;
 
-      // Отключаем оригинал (он привязан к маркеру)
-      target.setAttribute('visible', false);
+      // Обновить world-матрицы перед чтением
+      sceneEl.object3D.updateMatrixWorld(true);
 
-      // Обновляем UI
-      fixed = true;
-      button.classList.add('fixed');
-      button.textContent = 'Зафиксировано';
+      const srcObj = trackedEl.object3D;           // объект, сидящий на маркере
+      const clone  = srcObj.clone(true);           // глубокий клон всей модели
+
+      // Считать мировую матрицу и разложить её в TRS
+      const worldMat = srcObj.matrixWorld.clone();
+      const pos   = new THREE.Vector3();
+      const quat  = new THREE.Quaternion();
+      const scale = new THREE.Vector3();
+      worldMat.decompose(pos, quat, scale);
+
+      // Применить мировые TRS к клону и "заморозить" матрицу
+      clone.position.copy(pos);
+      clone.quaternion.copy(quat);
+      clone.scale.copy(scale);
+      clone.updateMatrix();
+      clone.matrixAutoUpdate = false;              // 🔒 фикс — больше не двигается
+
+      // 3) Добавить напрямую в мировую сцену (не в DOM-entity с маркером!)
+      sceneEl.object3D.add(clone);
+
+      // 4) Спрятать маркерный якорь (камера продолжит работать)
+      markerEl.setAttribute('visible', false);
+
+      // 5) UI
+      fixedOnce = true;
+      btn.classList.add('fixed');
+      btn.textContent = 'Зафиксировано';
+      btn.disabled = true;
     });
   </script>
 </body>
