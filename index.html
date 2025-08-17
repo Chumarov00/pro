@@ -2,32 +2,23 @@
 <html>
   <head>
     <meta charset="utf-8">
-    <title>MindAR Fix Model</title>
+    <title>MindAR — базовая рабочая сцена</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no"/>
     <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
     <style>
       body { margin: 0; overflow: hidden; }
       #ar-container { width: 100vw; height: 100vh; position: fixed; top: 0; left: 0; }
-      #fix-button{
-        position:absolute; top:20px; left:50%; transform:translateX(-50%);
-        padding:12px 24px; font-size:18px; font-weight:bold;
-        background:rgba(0,123,255,0.9); color:#fff; border:none; border-radius:10px;
-        z-index:10; cursor:pointer; box-shadow:0 2px 8px rgba(0,0,0,0.2);
-      }
-      #fix-button.fixed{ background:green; pointer-events:none; opacity:.85; }
     </style>
   </head>
   <body>
     <div id="ar-container">
-      <button id="fix-button" disabled>Сканируй маркер…</button>
-
       <a-scene 
         mindar-image="imageTargetSrc: https://chumarov00.github.io/pro/targets.mind;" 
-        vr-mode-ui="enabled: false"
+        vr-mode-ui="enabled: false" 
         device-orientation-permission-ui="enabled: true"
         embedded
-        renderer="colorManagement: true, physicallyCorrectLights"
-        id="scene">
+        renderer="colorManagement: true, physicallyCorrectLights">
 
         <a-assets>
           <a-asset-item id="model" src="https://chumarov00.github.io/pro/model.glb"></a-asset-item>
@@ -35,66 +26,15 @@
 
         <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
 
-        <!-- Маркер + отслеживаемая модель -->
-        <a-entity id="model-container" mindar-image-target="targetIndex: 0">
-          <a-gltf-model id="tracked-model" src="#model" position="0 0 0" scale="0.2 0.2 0.2"></a-gltf-model>
+        <a-entity mindar-image-target="targetIndex: 0">
+          <a-gltf-model 
+            src="#model" 
+            position="0 0 0" 
+            rotation="0 0 0" 
+            scale="0.2 0.2 0.2">
+          </a-gltf-model>
         </a-entity>
       </a-scene>
     </div>
-
-    <script>
-      const THREE = AFRAME.THREE;                       // ✅ ключевая строка
-      const btn            = document.getElementById('fix-button');
-      const sceneEl        = document.getElementById('scene');
-      const markerEntity   = document.getElementById('model-container');
-      const trackedEntity  = document.getElementById('tracked-model');
-
-      let fixed = false;
-      let markerVisible = false;
-
-      // Делаем кнопку активной только когда маркер в кадре
-      markerEntity.addEventListener('targetFound', () => { markerVisible = true; if(!fixed){ btn.disabled = false; btn.textContent='📌 Зафиксировать'; }});
-      markerEntity.addEventListener('targetLost',  () => { markerVisible = false; if(!fixed){ btn.disabled = true;  btn.textContent='Сканируй маркер…'; }});
-
-      btn.addEventListener('click', () => {
-        if (fixed || !markerVisible) return;
-
-        // Убедимся, что world-матрицы актуальны
-        sceneEl.object3D.updateMatrixWorld(true);
-
-        const src = trackedEntity.object3D;
-        const pos   = new THREE.Vector3();
-        const quat  = new THREE.Quaternion();
-        const scale = new THREE.Vector3();
-        src.getWorldPosition(pos);
-        src.getWorldQuaternion(quat);
-        src.getWorldScale(scale);
-
-        // Создаём независимую сущность
-        const fixedEntity = document.createElement('a-entity');
-        fixedEntity.setAttribute('gltf-model', '#model');
-        fixedEntity.setAttribute('scale', `${scale.x} ${scale.y} ${scale.z}`);
-
-        // Ждём, пока GLTF загрузится, затем переносим МИРОВЫЕ TRS и "замораживаем" матрицу
-        fixedEntity.addEventListener('model-loaded', () => {
-          const obj = fixedEntity.getObject3D('mesh') || fixedEntity.object3D;
-          obj.position.copy(pos);
-          obj.quaternion.copy(quat);
-          obj.updateMatrix();
-          obj.matrixAutoUpdate = false;               // 🔒 больше не двигается/не дрожит
-        });
-
-        // Добавляем в СЦЕНУ (не в маркер, не в камеру)
-        sceneEl.appendChild(fixedEntity);
-
-        // Прячем маркерную версию, сканер остаётся активным
-        markerEntity.setAttribute('visible', 'false');
-
-        fixed = true;
-        btn.classList.add('fixed');
-        btn.textContent = 'Зафиксировано';
-        btn.disabled = true;
-      });
-    </script>
   </body>
 </html>
