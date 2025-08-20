@@ -2,7 +2,7 @@
 <html>
   <head>
     <meta charset="utf-8">
-    <title>MindAR12 </title>
+    <title>MindAR 12</title>
     <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no"/>
     <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
@@ -27,19 +27,88 @@
         <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
 
         <a-entity mindar-image-target="targetIndex: 0">
-          <!-- ОБЁРТКА, которую крутим -->
-          <a-entity animation__spin="property: rotation; to: 0 360 0; loop: true; dur: 8000; easing: linear">
-            <a-gltf-model 
-              src="#model" 
-              position="0 0 0" 
-              rotation="0 0 0" 
-              scale="0.2 0.2 0.2">
-            </a-gltf-model>
-          </a-entity>
+          <a-gltf-model 
+            id="dino"
+            src="#model" 
+            position="0 0 0" 
+            rotation="0 0 0" 
+            scale="0.3 0.3 0.3"
+            <!-- ПРАВКА: махание хвостом. Поменяй node на реальное имя! -->
+            tail-wag="node: Tail; axis: y; amplitude: 0.35; speed: 1.2">
+          </a-gltf-model>
         </a-entity>
       </a-scene>
     </div>
+
+    <!-- Компонент «махание хвостом» -->
+    <script>
+      AFRAME.registerComponent('tail-wag', {
+        schema: {
+          node: {type: 'string', default: 'Tail'}, // имя кости/узла хвоста
+          axis: {type: 'string', default: 'y'},    // 'x' | 'y' | 'z'
+          amplitude: {type: 'number', default: 0.35}, // радианы (~20°)
+          speed: {type: 'number', default: 1.2},       // Гц (кол-во раз/сек)
+          offset: {type: 'number', default: 0}         // фазовый сдвиг
+        },
+        init() {
+          this.THREE = AFRAME.THREE;
+          this.target = null;
+          this.baseRot = new this.THREE.Euler();
+          this._bindModel = this._bindModel.bind(this);
+          this.el.addEventListener('model-loaded', this._bindModel);
+        },
+        remove() {
+          this.el.removeEventListener('model-loaded', this._bindModel);
+        },
+        _bindModel() {
+          const obj = this.el.getObject3D('mesh');
+          if (!obj) return;
+
+          // 1) пробуем найти узел по имени напрямую
+          let t = obj.getObjectByName(this.data.node);
+
+          // 2) если не нашли — ищем кость в skeleton
+          if (!t) {
+            obj.traverse(o => {
+              if (!t && o.isSkinnedMesh && o.skeleton) {
+                const bone = o.skeleton.bones.find(b => b.name === this.data.node);
+                if (bone) t = bone;
+              }
+            });
+          }
+
+          if (t) {
+            this.target = t;
+            this.baseRot.copy(t.rotation);
+          } else {
+            console.warn('tail-wag: не найден узел/кость с именем:', this.data.node);
+          }
+        },
+        tick(timeMs) {
+          if (!this.target) return;
+          const t = timeMs / 1000;
+          const a = this.data.amplitude;
+          const w = this.data.speed * 2 * Math.PI; // рад/с
+          const v = a * Math.sin(w * t + this.data.offset);
+
+          // вращаем вокруг выбранной оси около базового угла
+          const r = this.target.rotation;
+          if (this.data.axis === 'x') r.x = this.baseRot.x + v;
+          else if (this.data.axis === 'y') r.y = this.baseRot.y + v;
+          else r.z = this.baseRot.z + v;
+
+          this.target.updateMatrixWorld();
+        }
+      });
+
+      // 🔎 Вывести список имён узлов, чтобы узнать правильное имя хвоста
+      document.addEventListener('DOMContentLoaded', () => {
+        const dino = document.querySelector('#dino');
+        dino.addEventListener('model-loaded', (e) => {
+          console.log('Список узлов/костей модели:');
+          e.detail.model.traverse(n => { if (n.name) console.log(n.name); });
+        });
+      });
+    </script>
   </body>
 </html>
-
-
