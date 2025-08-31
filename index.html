@@ -1,145 +1,209 @@
 <!DOCTYPE html>
-<html>
-  <head>
-    <meta charset="utf-8">
-    <title>MindAR — ёлка с миганием</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no"/>
-    <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
-    <style>
-      body { margin: 0; overflow: hidden; }
-      #ar-container { width: 100vw; height: 100vh; position: fixed; inset: 0; }
-    </style>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <title>MindAR: выбор модели перед сканированием</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no"/>
+  <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
+  <style>
+    body { margin:0; overflow:hidden; }
+    #ar { position:fixed; inset:0; }
+    /* Оверлей выбора */
+    #choose {
+      position:fixed; inset:0; background:#0b0c0fd0; color:#fff;
+      display:flex; align-items:center; justify-content:center; z-index:10;
+      font-family: system-ui, Arial, sans-serif;
+    }
+    .panel {
+      width:min(720px, 92vw); border-radius:16px; padding:18px;
+      background:#17191f; box-shadow:0 10px 30px #0008;
+    }
+    .row { display:flex; gap:12px; flex-wrap:wrap; margin:8px 0 14px; }
+    .card {
+      flex:1 1 220px; border-radius:14px; padding:12px; background:#222531; cursor:pointer;
+      border:2px solid transparent; user-select:none;
+    }
+    .card.active { border-color:#5da9ff; background:#1e2736; }
+    .meta { font-size:12px; opacity:.8; margin-top:6px }
+    .actions { display:flex; gap:12px; justify-content:flex-end }
+    button {
+      border:0; padding:10px 14px; border-radius:10px; font-weight:600; cursor:pointer;
+    }
+    .ghost { background:#31394a; color:#fff; }
+    .primary { background:#4aa8ff; color:#001525; }
+    .hint { font-size:12px; opacity:.7; margin-top:8px }
+  </style>
 
-    <!-- Компонент мигания гирлянды и шариков -->
-    <script>
-      AFRAME.registerComponent('blink-lights', {
-        schema: {
-          targets: {type: 'string', default: 'garland, ornaments'}, // что мигать
-          mode:    {type: 'string', default: 'byColor'},            // all | byColor | twinkle
-          speed:   {type: 'number', default: 2.4},
-          min:     {type: 'number', default: 0.06},
-          max:     {type: 'number', default: 1.6}
-        },
-        init() {
-          this.t = 0;
-          this.groups = { garland: [], red: [], blue: [], gold: [], other: [] };
-          this.randPhase = new Map();
-
-          this.el.addEventListener('model-loaded', () => {
-            const obj = this.el.getObject3D('mesh');
-            if (!obj) return;
-
-            const wantG = /garland/i.test(this.data.targets);
-            const wantO = /ornament/i.test(this.data.targets);
-
-            obj.traverse(node => {
-              if (!node.isMesh || !node.material) return;
-              const mats = Array.isArray(node.material) ? node.material : [node.material];
-              const name = (node.name || '') + ' ' + mats.map(m => m.name || '').join(' ');
-
-              // определяем группы по имени узла ИЛИ имени материала
-              let picked = false;
-              if (wantG && /garland/i.test(name)) {
-                this.groups.garland.push({node, mats}); picked = true;
-              }
-              if (wantO && /(ornaments|ornred|ornblue|orngold|orn)/i.test(name)) {
-                if (/red/i.test(name))       this.groups.red.push({node, mats});
-                else if (/blue/i.test(name)) this.groups.blue.push({node, mats});
-                else if (/(gold|yellow)/i.test(name)) this.groups.gold.push({node, mats});
-                else this.groups.other.push({node, mats});
-                picked = true;
-              }
-
-              if (picked) {
-                mats.forEach(m => {
-                  if ('emissive' in m) {
-                    const c = m.color ? m.color : new THREE.Color(1,1,1);
-                    m.emissive.setRGB(c.r, c.g, c.b);
-                    if (m.emissiveIntensity !== undefined) m.emissiveIntensity = this.data.min;
-                  }
-                });
-                this.randPhase.set(node, Math.random() * Math.PI * 2);
-              }
-            });
+  <!-- Моргание гирлянды и шариков -->
+  <script>
+    AFRAME.registerComponent('blink-lights', {
+      schema:{targets:{type:'string',default:'garland, ornaments'},mode:{type:'string',default:'byColor'},speed:{type:'number',default:2.4},min:{type:'number',default:0.06},max:{type:'number',default:1.6}},
+      init(){ this.t=0; this.groups={garland:[],red:[],blue:[],gold:[],other:[]}; this.randPhase=new Map();
+        this.el.addEventListener('model-loaded', ()=>{
+          const obj=this.el.getObject3D('mesh'); if(!obj) return;
+          const wantG=/garland/i.test(this.data.targets), wantO=/ornament/i.test(this.data.targets);
+          obj.traverse(n=>{
+            if(!n.isMesh||!n.material) return;
+            const mats=Array.isArray(n.material)?n.material:[n.material];
+            const name=(n.name||'')+' '+mats.map(m=>m.name||'').join(' ');
+            let picked=false;
+            if(wantG && /garland/i.test(name)){ this.groups.garland.push({n,mats}); picked=true; }
+            if(wantO && /(ornaments|ornred|ornblue|orngold|orn)/i.test(name)){
+              if(/red/i.test(name)) this.groups.red.push({n,mats});
+              else if(/blue/i.test(name)) this.groups.blue.push({n,mats});
+              else if(/(gold|yellow)/i.test(name)) this.groups.gold.push({n,mats});
+              else this.groups.other.push({n,mats});
+              picked=true;
+            }
+            if(picked){
+              mats.forEach(m=>{
+                if('emissive' in m){
+                  const c=m.color?m.color:new THREE.Color(1,1,1);
+                  m.emissive.setRGB(c.r,c.g,c.b);
+                  if(m.emissiveIntensity!==undefined) m.emissiveIntensity=this.data.min;
+                }
+              });
+              this.randPhase.set(n, Math.random()*Math.PI*2);
+            }
           });
-        },
-        _applyIntensity(items, intensity) {
-          items.forEach(({mats}) => {
-            mats.forEach(m => {
-              if (m.emissiveIntensity !== undefined) m.emissiveIntensity = intensity;
-            });
+        });
+      },
+      _applyIntensity(items, v){ items.forEach(({mats})=>mats.forEach(m=>{ if(m.emissiveIntensity!==undefined) m.emissiveIntensity=v; })); },
+      tick(time,delta){
+        const dt=delta/1000; if(dt<=0) return; this.t+=dt;
+        const {min,max,speed,mode}=this.data;
+        const sin=(ph=0)=>(Math.sin(this.t*speed+ph)+1)/2;
+        const toI=(s)=>min+s*(max-min);
+        const g=this.groups, all=[...g.garland,...g.red,...g.blue,...g.gold,...g.other];
+        if(all.length===0) return;
+        if(mode==='all'){ this._applyIntensity(all,toI(sin())); }
+        else if(mode==='byColor'){
+          this._applyIntensity(g.red.length?g.red:all,  toI(sin(0)));
+          this._applyIntensity(g.blue.length?g.blue:all,toI(sin(2.094)));
+          this._applyIntensity(g.gold.length?g.gold:all,toI(sin(4.188)));
+          this._applyIntensity(g.garland,               toI(sin(Math.PI)));
+        } else { // twinkle
+          all.forEach(({mats},i)=>{
+            const ph=(i*1.7)%6.28;
+            const v=toI(sin(ph));
+            mats.forEach(m=>{ if(m.emissiveIntensity!==undefined) m.emissiveIntensity=v; });
           });
-        },
-        tick(time, delta) {
-          if (!this.el.getObject3D('mesh')) return;
-          const dt = delta / 1000; if (dt <= 0) return;
-          this.t += dt;
-
-          const {min, max, speed, mode} = this.data;
-          const sin = (ph=0)=> (Math.sin(this.t * speed + ph) + 1) / 2;
-          const toI = (s)=> min + s * (max - min);
-
-          const g = this.groups;
-          const all = [...g.garland, ...g.red, ...g.blue, ...g.gold, ...g.other];
-          if (all.length === 0) return;
-
-          if (mode === 'all') {
-            this._applyIntensity(all, toI(sin()));
-          } else if (mode === 'byColor') {
-            this._applyIntensity(g.red.length ? g.red : all,   toI(sin(0)));        // красные
-            this._applyIntensity(g.blue.length ? g.blue : all, toI(sin(2.094)));    // синие (120°)
-            this._applyIntensity(g.gold.length ? g.gold : all, toI(sin(4.188)));    // золотые (240°)
-            this._applyIntensity(g.garland,                     toI(sin(Math.PI))); // гирлянда в противофазе
-          } else { // twinkle
-            all.forEach(({node, mats}) => {
-              const ph = this.randPhase.get(node) || 0;
-              const inten = toI(sin(ph));
-              mats.forEach(m => { if (m.emissiveIntensity !== undefined) m.emissiveIntensity = inten; });
-            });
-          }
         }
-      });
-    </script>
-  </head>
+      }
+    });
+  </script>
+</head>
+<body>
 
-  <body>
-    <div id="ar-container">
-      <a-scene
-        mindar-image="imageTargetSrc: https://chumarov00.github.io/pro/targets.mind"
-        vr-mode-ui="enabled: false"
-        device-orientation-permission-ui="enabled: true"
-        embedded
-        renderer="colorManagement: true; physicallyCorrectLights: true; antialias: true">
+  <!-- Оверлей выбора модели -->
+  <div id="choose">
+    <div class="panel">
+      <h3 style="margin:0 0 8px">Выберите модель</h3>
+      <div class="row" id="cards">
+        <div class="card" data-key="tree" data-scale="0.2 0.2 0.2" data-rotation="0 0 0" data-position="0 0 0">
+          <b>Ёлка</b>
+          <div class="meta">Christmas tree.glb</div>
+          <div class="hint">Мигают гирлянда и игрушки</div>
+        </div>
+        <div class="card" data-key="model2" data-scale="0.2 0.2 0.2" data-rotation="0 0 0" data-position="0 0 0">
+          <b>Model 2</b>
+          <div class="meta">model2.glb</div>
+          <div class="hint">Масштаб можно поменять в коде</div>
+        </div>
+      </div>
+      <div class="actions">
+        <button class="ghost" id="cancel">Отмена</button>
+        <button class="primary" id="start" disabled>Начать AR</button>
+      </div>
+      <div class="hint">Сканирование запустится после выбора модели</div>
+    </div>
+  </div>
 
-        <!-- свет -->
-        <a-entity light="type: hemisphere; intensity: 0.9"></a-entity>
-        <a-entity light="type: directional; intensity: 0.9" position="1 2 1"></a-entity>
+  <!-- Сцена AR (автостарт отключён) -->
+  <div id="ar">
+    <a-scene
+      mindar-image="imageTargetSrc: https://chumarov00.github.io/pro/targets.mind; autoStart: false"
+      renderer="colorManagement: true; physicallyCorrectLights: true; antialias: true"
+      vr-mode-ui="enabled: false"
+      device-orientation-permission-ui="enabled: true"
+      embedded>
 
-        <!-- ассеты -->
-        <a-assets>
-          <!-- Если оставляешь пробел в имени, используй %20 -->
-          <a-asset-item id="tree" src="https://chumarov00.github.io/pro/Christmas%20tree.glb"></a-asset-item>
-          <!-- лучше: переименуй файл в Christmas_tree.glb и поправь путь -->
-        </a-assets>
+      <!-- Свет -->
+      <a-entity light="type: hemisphere; intensity: 0.9"></a-entity>
+      <a-entity light="type: directional; intensity: 0.9" position="1 2 1"></a-entity>
 
-        <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
+      <!-- Ассеты -->
+      <a-assets>
+        <!-- Если в имени файлa есть пробел — используем %20 -->
+        <a-asset-item id="tree" src="https://chumarov00.github.io/pro/Christmas%20tree.glb"></a-asset-item>
+        <a-asset-item id="model2" src="https://chumarov00.github.io/pro/model2.glb"></a-asset-item>
+      </a-assets>
 
-        <a-entity mindar-image-target="targetIndex: 0">
-          <!-- обёртка: крутим для наглядности -->
-          <a-entity animation__spin="property: rotation; to: 0 360 0; loop: true; dur: 8000; easing: linear">
-            <!-- модель + мигание -->
-            <a-entity
-              gltf-model="#tree"
-              position="0 0 0"
-              rotation="0 0 0"
-              scale="0.2 0.2 0.2"
-              blink-lights="targets: garland, ornaments; mode: byColor; speed: 2.4; min: 0.06; max: 1.6">
-            </a-entity>
+      <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
+
+      <!-- Якорь -->
+      <a-entity mindar-image-target="targetIndex: 0">
+        <!-- Обёртка, чтобы можно было вращать/масштабировать всю модель -->
+        <a-entity id="modelWrapper" animation__spin="property: rotation; to: 0 360 0; loop: true; dur: 9000; easing: linear">
+          <!-- Сама модель: атрибут gltf-model выставим после выбора -->
+          <a-entity id="model"
+                    position="0 0 0"
+                    rotation="0 0 0"
+                    scale="0.2 0.2 0.2"
+                    blink-lights="targets: garland, ornaments; mode: byColor; speed: 2.4; min: 0.06; max: 1.6">
           </a-entity>
         </a-entity>
+      </a-entity>
 
-      </a-scene>
-    </div>
-  </body>
+    </a-scene>
+  </div>
+
+  <script>
+    // Карточки выбора
+    const cards = document.querySelectorAll('.card');
+    let selected = null;
+    cards.forEach(c=>{
+      c.addEventListener('click', ()=>{
+        cards.forEach(x=>x.classList.remove('active'));
+        c.classList.add('active');
+        selected = {
+          key: c.dataset.key,
+          src: '#' + c.dataset.key,               // #tree или #model2
+          scale: c.dataset.scale || '0.2 0.2 0.2',
+          rotation: c.dataset.rotation || '0 0 0',
+          position: c.dataset.position || '0 0 0'
+        };
+        document.getElementById('start').disabled = false;
+      });
+    });
+
+    // Кнопки
+    document.getElementById('cancel').onclick = ()=>{ location.reload(); };
+    document.getElementById('start').onclick = async ()=>{
+      if (!selected) return;
+
+      // Применяем выбор к сущности модели
+      const modelEl = document.getElementById('model');
+      modelEl.setAttribute('gltf-model', selected.src);
+      modelEl.setAttribute('scale', selected.scale);
+      modelEl.setAttribute('rotation', selected.rotation);
+      modelEl.setAttribute('position', selected.position);
+
+      // Запускаем MindAR после выбора
+      const sceneEl = document.querySelector('a-scene');
+      const mindar = sceneEl.systems['mindar-image-system'];
+      try {
+        await mindar.start(); // откроется камера, начнётся сканирование
+      } catch (e) {
+        console.error(e);
+        alert('Не удалось запустить камеру/AR. Проверьте HTTPS и разрешения.');
+        return;
+      }
+
+      // Спрячем оверлей выбора
+      document.getElementById('choose').style.display = 'none';
+    };
+  </script>
+</body>
 </html>
